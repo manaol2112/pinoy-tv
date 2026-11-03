@@ -28,6 +28,13 @@
   .tab[aria-selected="true"]{background:var(--text);color:var(--bg);font-weight:600}
   .tab:focus-visible,.tab.kfocus{outline:none;border-color:var(--focus)}
   main{padding:12px clamp(16px,4vw,48px) 40px}
+  .status{display:flex;align-items:center;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:14px;min-height:30px;margin:0 0 12px}
+  .status .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:6px;animation:pulse 1s infinite}
+  @keyframes pulse{50%{opacity:.3}}
+  .sbtn{background:var(--panel);color:var(--text);border:2px solid transparent;border-radius:8px;padding:5px 12px;font-size:13px;cursor:pointer}
+  .sbtn:focus-visible{outline:none;border-color:var(--focus)}
+  .card.bad{opacity:.45}
+  #probes{position:fixed;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;left:-9999px}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:18px}
   .card{position:relative;background:var(--panel);border:3px solid transparent;border-radius:16px;
     padding:0;cursor:pointer;text-align:left;color:inherit;overflow:hidden;
@@ -77,11 +84,15 @@
 
 <nav class="tabs" role="tablist" id="tabs"></nav>
 <main>
+  <div class="status" id="status"><span id="statusText"></span>
+    <button class="sbtn" id="showAllBtn" hidden>Show hidden</button>
+    <button class="sbtn" id="recheckBtn" hidden>Re-check</button></div>
   <div class="grid" id="grid"></div>
-  <p class="hint">Works with a TV remote or keyboard: <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> to move, <kbd>OK</kbd>/<kbd>Enter</kbd> to watch, <kbd>Back</kbd>/<kbd>Esc</kbd> to return. Number keys jump straight to a channel.</p>
+  <p class="hint">Works with a TV remote or keyboard: <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> to move, <kbd>OK</kbd>/<kbd>Enter</kbd> to watch, <kbd>Back</kbd>/<kbd>Esc</kbd> to return. Number keys jump straight to a channel. When the app opens it checks every channel on your device and hides the ones that cannot play here; use <b>Show hidden</b> to see them anyway.</p>
 </main>
 <footer>Every TV channel and radio station here is the broadcaster's own free, official livestream, played inside this app. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Networks decide where their streams can play, so some may be unavailable outside the Philippines or outside YouTube; the app marks those for you.</footer>
 
+<div id="probes" aria-hidden="true"></div>
 <section id="player" aria-modal="true" role="dialog">
   <div class="pbar">
     <button class="pbtn" id="backBtn">← Back</button>
@@ -101,28 +112,43 @@ const CHANNELS = [
   // TV
   {n:"Kapamilya Online Live", net:"ABS-CBN", cat:"TV", id:"UCstEtN0pgOmCf02EdXsGChw",
    d:"ABS-CBN teleseryes and shows, streamed 24/7", c:["#0b3d91","#1fa34a","#e63946"]},
+  {n:"GMA Kapuso Stream", net:"GMA", cat:"TV", id:"UCKL5hAuzgFQsyrsQKgU0Qng",
+   d:"GMA's shows live all day, Unang Hirit to Telebabad", c:["#e85d04","#9d0208"]},
   {n:"ABS-CBN News", net:"ABS-CBN", cat:"TV", id:"UCE2606prvXQc_noEqKxVJXA",
    d:"TV Patrol, breaking news and special coverage", c:["#0b3d91","#1d4ed8"]},
-  {n:"ANC 24/7", net:"ANC", cat:"TV", id:"UCvi6hEzLM-Z_unKPSuuzKvg",
-   d:"ABS-CBN News Channel, English-language news", c:["#7a0a0a","#c1121f"]},
   {n:"GMA News", net:"GMA", cat:"TV", id:"UCqYw-CTd1dU2yGI71sEyqNw",
    d:"24 Oras, Saksi and live news coverage", c:["#ff6b00","#d00000"]},
-  {n:"GMA Public Affairs", net:"GMA", cat:"TV", id:"UCj5RwDivLksanrNvkW0FB4w",
-   d:"KMJS, documentaries and public affairs", c:["#f77f00","#6a040f"]},
+  {n:"ANC 24/7", net:"ANC", cat:"TV", id:"UCvi6hEzLM-Z_unKPSuuzKvg",
+   d:"ABS-CBN News Channel, English-language news", c:["#7a0a0a","#c1121f"]},
+  {n:"News5", net:"TV5", cat:"TV", id:"UCGEbMwiX774cseKvJqF9R2g",
+   d:"TV5's 24/7 online news channel, Frontline Pilipinas", c:["#3a0ca3","#f72585"]},
   {n:"One PH", net:"One PH", cat:"TV", id:"UCi-D5IxBR2HahDyfJfqy7jA",
    d:"Public service and news (Cignal)", c:["#00296b","#00509d"]},
   {n:"PTV", net:"PTV", cat:"TV", id:"UCJCUbMaY593_4SN1QPG7NFQ",
    d:"People's Television, state broadcaster", c:["#0038a8","#ce1126"]},
+  {n:"UNTV News and Rescue", net:"UNTV", cat:"TV", id:"UC3XaG-7UVi2vD8ZZEMNnnpw",
+   d:"Public service channel, news and rescue, 24/7", c:["#014f86","#2a9d8f"]},
+  {n:"NET25", net:"NET25", cat:"TV", id:"UCnYlMfpbCIg54cEyUiE42vw",
+   d:"NET25 news and information", c:["#6a040f","#370617"]},
+  {n:"GMA Regional TV", net:"GMA RTV", cat:"TV", id:"UCVoawkpW12kgtXgInbPCrhQ",
+   d:"Balitang Bisdak, One Mindanao, regional news", c:["#f48c06","#6a040f"]},
+  {n:"GMA Public Affairs", net:"GMA", cat:"TV", id:"UCj5RwDivLksanrNvkW0FB4w",
+   d:"KMJS, documentaries and public affairs", c:["#f77f00","#6a040f"]},
   // Radio (the stations' own YouTube livestreams)
   {n:"DZMM TeleRadyo 630", net:"DZMM", cat:"Radio", id:"UCs_VNu-FQ0WcJnD4QkmIL5w", radio:true,
-   d:"Radyo Patrol 630 — ABS-CBN news and public service radio", c:["#1b4332","#2d6a4f"]},
+   d:"Radyo Patrol 630, ABS-CBN news and public service radio", c:["#1b4332","#2d6a4f"]},
   {n:"Super Radyo DZBB 594", net:"DZBB", cat:"Radio", id:"UCYFgnkDYr-G5L_iy6DZdvSA", radio:true,
-   d:"GMA's flagship AM station — Ito ang Balita!", c:["#9d0208","#e85d04"]},
+   d:"GMA's flagship AM station, Ito ang Balita!", c:["#9d0208","#e85d04"]},
   {n:"DZRH 666", net:"DZRH", cat:"Radio", id:"UCcTiBX8js_djhSSlmJRI99A", radio:true,
-   d:"DZRH News Television — MBC's flagship AM station, 24/7", c:["#003049","#669bbc"]},
+   d:"DZRH News Television, MBC's flagship AM station, 24/7", c:["#003049","#669bbc"]},
+  {n:"Bombo Radyo", net:"BOMBO", cat:"Radio", id:"UCVVw9u0pZ3nnWxx7WyE8YkQ", radio:true,
+   d:"Bombo Radyo Philippines nationwide news and coverage", c:["#000814","#ffc300"]},
+  {n:"Barangay LS 97.1", net:"BARANGAY LS", cat:"Radio", id:"UClbtDsQ1UHd-xlohI5vfKQg", radio:true,
+   d:"GMA's flagship FM, Barangay Love Stories, Forever!", c:["#7b2cbf","#ff6d00"]},
   {n:"90.7 Love Radio", net:"LOVE RADIO", cat:"Radio", id:"UC934DvzBQQnB5qBJpc50obg", radio:true,
    d:"OPM hits and Manila's favorite FM station", c:["#b5179e","#f72585"]},
 ];
+
 
 const CATS = ["All","TV","Radio"];
 let curCat = "All", curIdx = -1;
@@ -131,7 +157,8 @@ const grid = $("#grid"), tabs = $("#tabs"), player = $("#player"), wrap = $("#fr
 // YouTube embeds need a real web origin; opened as a local file they show Error 153.
 const canEmbed = /^https?:$/.test(location.protocol);
 
-const visible = () => CHANNELS.filter(c => curCat==="All" || c.cat===curCat);
+let showAll=false;
+const visible = () => CHANNELS.filter(c => (curCat==="All" || c.cat===curCat) && (showAll || !c.bad));
 
 function renderTabs(){
   tabs.innerHTML = "";
@@ -158,13 +185,57 @@ function showUnavailable(i,code){
   wrap.innerHTML=`<div class="offline"><h2>${ch.n} is unavailable</h2><p>${why}</p>
     <p><button class="pbtn" id="skipBtn">Try next channel →</button></p></div>`;
   const b=document.getElementById("skipBtn"); b.onclick=()=>zap(1); b.focus();
-  CHANNELS[i].bad=true; markCards();
+  CHANNELS[i].bad=(code===101||code===150)?"geo":"off"; saveProbe(); markCards();
 }
 function markCards(){ grid.querySelectorAll(".card").forEach(c=>{
   const ch=CHANNELS[+c.dataset.i]; const l=c.querySelector(".live");
-  if(ch.bad){ l.textContent="UNAVAILABLE"; l.style.background="#555"; } }); }
+  if(ch.bad){ c.classList.add("bad"); l.textContent=ch.bad==="geo"?"BLOCKED HERE":"NOT LIVE NOW"; l.style.background="#555"; }
+  else { c.classList.remove("bad"); l.textContent=ch.radio?"RADIO":"● LIVE"; l.style.background=""; } }); }
 
-renderTabs(); renderGrid(); focusCard(0);};
+/* ---- Self-test: on this device, quietly try every channel and hide the ones that can't play here ---- */
+const PROBE_TTL=6*3600*1000, PROBE_KEY="pinoytv-probe-v1";
+function saveProbe(){ try{ localStorage.setItem(PROBE_KEY, JSON.stringify({t:Date.now(), bad:Object.fromEntries(CHANNELS.map(c=>[c.id,c.bad||null]))})); }catch(e){} }
+function loadProbe(){ try{ const o=JSON.parse(localStorage.getItem(PROBE_KEY)||"null"); if(!o||Date.now()-o.t>PROBE_TTL) return false;
+  CHANNELS.forEach(c=>{ c.bad=o.bad[c.id]||null; }); return true; }catch(e){ return false; } }
+function setStatus(html, busy){ const t=document.getElementById("statusText"); t.innerHTML=(busy?'<span class="dot"></span>':"")+html; }
+function refreshStatus(){
+  const hidden=CHANNELS.filter(c=>c.bad).length, ok=CHANNELS.length-hidden;
+  const sa=document.getElementById("showAllBtn"), rb=document.getElementById("recheckBtn");
+  sa.hidden=!hidden; rb.hidden=false; sa.textContent=showAll?`Hide unavailable (${hidden})`:`Show hidden (${hidden})`;
+  setStatus(hidden?`${ok} channels play on this device · ${hidden} hidden (blocked here or not live)`:`All ${ok} channels look playable on this device`);
+}
+function probeAll(force){
+  if(!canEmbed){ setStatus("Open this app from its web address to check and play channels."); return; }
+  if(!force && loadProbe()){ renderGrid(); markCards(); refreshStatus(); return; }
+  CHANNELS.forEach(c=>c.bad=null);
+  const box=document.getElementById("probes"); box.innerHTML="";
+  let done=0, queue=[...CHANNELS.keys()], running=0, MAXP=3;
+  setStatus(`Checking ${CHANNELS.length} channels on this device…`, true);
+  document.getElementById("recheckBtn").hidden=true;
+  const finish=()=>{ box.innerHTML=""; saveProbe(); renderGrid(); markCards(); refreshStatus(); focusCard(0); };
+  const next=()=>{
+    while(running<MAXP && queue.length){ running++; probeOne(queue.shift(), ()=>{ running--; done++;
+      setStatus(`Checking channels… ${done}/${CHANNELS.length}`, true); done===CHANNELS.length?finish():next(); }); }
+  };
+  ytReady?next():ytQueue.push(next);
+  function probeOne(i, cb){
+    const ch=CHANNELS[i]; let settled=false, pl=null;
+    const f=document.createElement("iframe"); f.id="probe-"+i;
+    f.src=`https://www.youtube.com/embed/live_stream?channel=${ch.id}&autoplay=1&mute=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`;
+    box.appendChild(f);
+    const end=(verdict)=>{ if(settled) return; settled=true; clearTimeout(tm); ch.bad=verdict; try{pl&&pl.destroy()}catch(e){} f.remove(); cb(); };
+    const tm=setTimeout(()=>end(null), 12000);           // no verdict in time: assume OK, don't hide
+    pl=new YT.Player(f,{events:{
+      onReady:e=>{ try{e.target.mute();e.target.playVideo();}catch(x){} },
+      onStateChange:e=>{ if(e.data===YT.PlayerState.PLAYING||e.data===YT.PlayerState.BUFFERING) end(null); },
+      onError:e=>{ end((e.data===101||e.data===150)?"geo":"off"); }
+    }});
+  }
+}
+document.getElementById("showAllBtn").onclick=()=>{ showAll=!showAll; renderGrid(); markCards(); refreshStatus(); focusCard(0); };
+document.getElementById("recheckBtn").onclick=()=>probeAll(true);
+
+renderTabs(); renderGrid(); focusCard(0); probeAll(false);};
     tabs.appendChild(b);
   });
 }
@@ -203,7 +274,7 @@ function closePlayer(){
   if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
   const card=grid.querySelector(`[data-i="${curIdx}"]`); (card||grid.firstChild)?.focus();
 }
-function zap(d){ const n=CHANNELS.length; play((curIdx+d+n)%n); }
+function zap(d){ const n=CHANNELS.length; let j=curIdx; for(let k=0;k<n;k++){ j=(j+d+n)%n; if(showAll||!CHANNELS[j].bad) break; } play(j); }
 
 $("#backBtn").onclick=closePlayer;
 $("#prevBtn").onclick=()=>zap(-1);
@@ -275,13 +346,57 @@ function showUnavailable(i,code){
   wrap.innerHTML=`<div class="offline"><h2>${ch.n} is unavailable</h2><p>${why}</p>
     <p><button class="pbtn" id="skipBtn">Try next channel →</button></p></div>`;
   const b=document.getElementById("skipBtn"); b.onclick=()=>zap(1); b.focus();
-  CHANNELS[i].bad=true; markCards();
+  CHANNELS[i].bad=(code===101||code===150)?"geo":"off"; saveProbe(); markCards();
 }
 function markCards(){ grid.querySelectorAll(".card").forEach(c=>{
   const ch=CHANNELS[+c.dataset.i]; const l=c.querySelector(".live");
-  if(ch.bad){ l.textContent="UNAVAILABLE"; l.style.background="#555"; } }); }
+  if(ch.bad){ c.classList.add("bad"); l.textContent=ch.bad==="geo"?"BLOCKED HERE":"NOT LIVE NOW"; l.style.background="#555"; }
+  else { c.classList.remove("bad"); l.textContent=ch.radio?"RADIO":"● LIVE"; l.style.background=""; } }); }
 
-renderTabs(); renderGrid(); focusCard(0);
+/* ---- Self-test: on this device, quietly try every channel and hide the ones that can't play here ---- */
+const PROBE_TTL=6*3600*1000, PROBE_KEY="pinoytv-probe-v1";
+function saveProbe(){ try{ localStorage.setItem(PROBE_KEY, JSON.stringify({t:Date.now(), bad:Object.fromEntries(CHANNELS.map(c=>[c.id,c.bad||null]))})); }catch(e){} }
+function loadProbe(){ try{ const o=JSON.parse(localStorage.getItem(PROBE_KEY)||"null"); if(!o||Date.now()-o.t>PROBE_TTL) return false;
+  CHANNELS.forEach(c=>{ c.bad=o.bad[c.id]||null; }); return true; }catch(e){ return false; } }
+function setStatus(html, busy){ const t=document.getElementById("statusText"); t.innerHTML=(busy?'<span class="dot"></span>':"")+html; }
+function refreshStatus(){
+  const hidden=CHANNELS.filter(c=>c.bad).length, ok=CHANNELS.length-hidden;
+  const sa=document.getElementById("showAllBtn"), rb=document.getElementById("recheckBtn");
+  sa.hidden=!hidden; rb.hidden=false; sa.textContent=showAll?`Hide unavailable (${hidden})`:`Show hidden (${hidden})`;
+  setStatus(hidden?`${ok} channels play on this device · ${hidden} hidden (blocked here or not live)`:`All ${ok} channels look playable on this device`);
+}
+function probeAll(force){
+  if(!canEmbed){ setStatus("Open this app from its web address to check and play channels."); return; }
+  if(!force && loadProbe()){ renderGrid(); markCards(); refreshStatus(); return; }
+  CHANNELS.forEach(c=>c.bad=null);
+  const box=document.getElementById("probes"); box.innerHTML="";
+  let done=0, queue=[...CHANNELS.keys()], running=0, MAXP=3;
+  setStatus(`Checking ${CHANNELS.length} channels on this device…`, true);
+  document.getElementById("recheckBtn").hidden=true;
+  const finish=()=>{ box.innerHTML=""; saveProbe(); renderGrid(); markCards(); refreshStatus(); focusCard(0); };
+  const next=()=>{
+    while(running<MAXP && queue.length){ running++; probeOne(queue.shift(), ()=>{ running--; done++;
+      setStatus(`Checking channels… ${done}/${CHANNELS.length}`, true); done===CHANNELS.length?finish():next(); }); }
+  };
+  ytReady?next():ytQueue.push(next);
+  function probeOne(i, cb){
+    const ch=CHANNELS[i]; let settled=false, pl=null;
+    const f=document.createElement("iframe"); f.id="probe-"+i;
+    f.src=`https://www.youtube.com/embed/live_stream?channel=${ch.id}&autoplay=1&mute=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`;
+    box.appendChild(f);
+    const end=(verdict)=>{ if(settled) return; settled=true; clearTimeout(tm); ch.bad=verdict; try{pl&&pl.destroy()}catch(e){} f.remove(); cb(); };
+    const tm=setTimeout(()=>end(null), 12000);           // no verdict in time: assume OK, don't hide
+    pl=new YT.Player(f,{events:{
+      onReady:e=>{ try{e.target.mute();e.target.playVideo();}catch(x){} },
+      onStateChange:e=>{ if(e.data===YT.PlayerState.PLAYING||e.data===YT.PlayerState.BUFFERING) end(null); },
+      onError:e=>{ end((e.data===101||e.data===150)?"geo":"off"); }
+    }});
+  }
+}
+document.getElementById("showAllBtn").onclick=()=>{ showAll=!showAll; renderGrid(); markCards(); refreshStatus(); focusCard(0); };
+document.getElementById("recheckBtn").onclick=()=>probeAll(true);
+
+renderTabs(); renderGrid(); focusCard(0); probeAll(false);
 </script>
 </body>
 </html>

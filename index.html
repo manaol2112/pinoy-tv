@@ -79,7 +79,7 @@
   <div class="grid" id="grid"></div>
   <p class="hint">Works with a TV remote or keyboard: <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> to move, <kbd>OK</kbd>/<kbd>Enter</kbd> to watch, <kbd>Back</kbd>/<kbd>Esc</kbd> to return. Number keys jump straight to a channel.</p>
 </main>
-<footer>Every stream here is the network's own free, official livestream, played inside this app. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Some streams may be geo-restricted outside the Philippines.</footer>
+<footer>Every stream here is the network's own free, official livestream, played inside this app. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Networks decide where their streams can play, so some may be unavailable outside the Philippines or outside YouTube; the app marks those for you.</footer>
 
 <section id="player" aria-modal="true" role="dialog">
   <div class="pbar">
@@ -126,7 +126,32 @@ function renderTabs(){
     const b = document.createElement("button");
     b.className="tab"; b.role="tab"; b.textContent=cat;
     b.setAttribute("aria-selected", cat===curCat);
-    b.onclick=()=>{curCat=cat; renderTabs(); renderGrid(); focusCard(0);};
+    b.onclick=()=>{curCat=cat; 
+/* Detect streams that won't play here and explain why instead of YouTube's bare "Video unavailable" */
+let ytReady=false, ytQueue=[];
+(function(){ if(!/^https?:$/.test(location.protocol)) return;
+  const t=document.createElement("script"); t.src="https://www.youtube.com/iframe_api"; document.head.appendChild(t); })();
+window.onYouTubeIframeAPIReady=()=>{ ytReady=true; ytQueue.splice(0).forEach(f=>f()); };
+function watchErrors(i){
+  const attach=()=>{ const f=document.getElementById("ytf"); if(!f||curIdx!==i) return;
+    new YT.Player(f,{events:{onError:e=>showUnavailable(i,e.data)}}); };
+  ytReady?attach():ytQueue.push(attach);
+}
+function showUnavailable(i,code){
+  if(curIdx!==i) return; const ch=CHANNELS[i];
+  const why = (code===101||code===150)
+    ? "The network isn't letting this stream play here right now. It may be blocked in your country, or the network may only allow it on YouTube itself."
+    : "This channel isn't broadcasting live right now. Try again later or switch channels.";
+  wrap.innerHTML=`<div class="offline"><h2>${ch.n} is unavailable</h2><p>${why}</p>
+    <p><button class="pbtn" id="skipBtn">Try next channel →</button></p></div>`;
+  const b=document.getElementById("skipBtn"); b.onclick=()=>zap(1); b.focus();
+  CHANNELS[i].bad=true; markCards();
+}
+function markCards(){ grid.querySelectorAll(".card").forEach(c=>{
+  const ch=CHANNELS[+c.dataset.i]; const l=c.querySelector(".live");
+  if(ch.bad){ l.textContent="UNAVAILABLE"; l.style.background="#555"; } }); }
+
+renderTabs(); renderGrid(); focusCard(0);};
     tabs.appendChild(b);
   });
 }
@@ -141,6 +166,7 @@ function renderGrid(){
     b.onclick=()=>play(+b.dataset.i);
     grid.appendChild(b);
   });
+  if(typeof markCards==="function") markCards();
 }
 function focusCard(i){ const cards=[...grid.children]; if(cards[i]) cards[i].focus(); }
 
@@ -151,9 +177,10 @@ function play(i){
     wrap.innerHTML=`<div class="offline"><h2>${ch.n}</h2>
       <p>To watch inside the app, open Pinoy TV from a web address instead of a saved file (for example, after uploading it to Netlify Drop or GitHub Pages).</p></div>`;
   } else {
-    wrap.innerHTML=`<iframe allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen
+    wrap.innerHTML=`<iframe id="ytf" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen
       referrerpolicy="strict-origin-when-cross-origin"
-      src="https://www.youtube-nocookie.com/embed/live_stream?channel=${ch.id}&autoplay=1&rel=0&playsinline=1&modestbranding=1"></iframe>`;
+      src="https://www.youtube.com/embed/live_stream?channel=${ch.id}&autoplay=1&rel=0&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}"></iframe>`;
+    watchErrors(i);
   }
   player.classList.add("open"); try{localStorage.setItem("pinoytv-last",i)}catch(e){}
   $("#backBtn").focus(); wake();
@@ -215,6 +242,31 @@ function tick(){
   $("#phDate").textContent=now.toLocaleDateString("en-PH",{timeZone:"Asia/Manila",weekday:"short",month:"short",day:"numeric"})+" · Manila";
 }
 tick(); setInterval(tick,15000);
+
+
+/* Detect streams that won't play here and explain why instead of YouTube's bare "Video unavailable" */
+let ytReady=false, ytQueue=[];
+(function(){ if(!/^https?:$/.test(location.protocol)) return;
+  const t=document.createElement("script"); t.src="https://www.youtube.com/iframe_api"; document.head.appendChild(t); })();
+window.onYouTubeIframeAPIReady=()=>{ ytReady=true; ytQueue.splice(0).forEach(f=>f()); };
+function watchErrors(i){
+  const attach=()=>{ const f=document.getElementById("ytf"); if(!f||curIdx!==i) return;
+    new YT.Player(f,{events:{onError:e=>showUnavailable(i,e.data)}}); };
+  ytReady?attach():ytQueue.push(attach);
+}
+function showUnavailable(i,code){
+  if(curIdx!==i) return; const ch=CHANNELS[i];
+  const why = (code===101||code===150)
+    ? "The network isn't letting this stream play here right now. It may be blocked in your country, or the network may only allow it on YouTube itself."
+    : "This channel isn't broadcasting live right now. Try again later or switch channels.";
+  wrap.innerHTML=`<div class="offline"><h2>${ch.n} is unavailable</h2><p>${why}</p>
+    <p><button class="pbtn" id="skipBtn">Try next channel →</button></p></div>`;
+  const b=document.getElementById("skipBtn"); b.onclick=()=>zap(1); b.focus();
+  CHANNELS[i].bad=true; markCards();
+}
+function markCards(){ grid.querySelectorAll(".card").forEach(c=>{
+  const ch=CHANNELS[+c.dataset.i]; const l=c.querySelector(".live");
+  if(ch.bad){ l.textContent="UNAVAILABLE"; l.style.background="#555"; } }); }
 
 renderTabs(); renderGrid(); focusCard(0);
 </script>

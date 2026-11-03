@@ -33,6 +33,10 @@
   @keyframes pulse{50%{opacity:.3}}
   .sbtn{background:var(--panel);color:var(--text);border:2px solid transparent;border-radius:8px;padding:5px 12px;font-size:13px;cursor:pointer}
   .sbtn:focus-visible{outline:none;border-color:var(--focus)}
+  .sinput{background:var(--panel);color:var(--text);border:2px solid transparent;border-radius:8px;padding:6px 12px;font-size:14px;min-width:220px;margin-left:auto}
+  .sinput:focus-visible{outline:none;border-color:var(--focus)}
+  .card.dm .tile .logo{object-fit:cover;padding:0}
+  .card.dm .name{font-size:14px;line-height:1.3}
   .card.bad{opacity:.45}
   #probes{position:fixed;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;left:-9999px}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:18px}
@@ -55,7 +59,7 @@
   .card.chanc .live{background:#08a045}
   .card.dm .tile .logo{object-fit:cover;padding:0}
   .card.dm .tile span{position:absolute;left:10px;bottom:8px;font-size:16px;background:#0009;padding:2px 8px;border-radius:6px}
-  .live{position:absolute;top:10px;left:10px;background:var(--red);color:#fff;font-size:11px;font-weight:700;
+  .live{position:absolute;z-index:2;top:10px;left:10px;background:var(--red);color:#fff;font-size:11px;font-weight:700;
     padding:3px 8px;border-radius:6px;letter-spacing:.6px}
   .hint{color:var(--muted);font-size:13px;margin:22px 0 0;line-height:1.5}
   .hint kbd{background:var(--panel2);border-radius:4px;padding:1px 6px;font-family:inherit;color:var(--text)}
@@ -104,11 +108,12 @@
 <main>
   <div class="status" id="status"><span id="statusText"></span>
     <button class="sbtn" id="showAllBtn" hidden>Show hidden</button>
-    <button class="sbtn" id="recheckBtn" hidden>Re-check</button></div>
+    <button class="sbtn" id="recheckBtn" hidden>Re-check</button>
+    <input id="dramaSearch" class="sinput" type="search" placeholder="Search dramas…" hidden></div>
   <div class="grid" id="grid"></div>
   <p class="hint">Works with a TV remote or keyboard: <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> to move, <kbd>OK</kbd>/<kbd>Enter</kbd> to watch, <kbd>Back</kbd>/<kbd>Esc</kbd> to return. Number keys jump straight to a channel. When the app opens it checks every channel on your device and hides the ones that cannot play here; use <b>Show hidden</b> to see them anyway.</p>
 </main>
-<footer><span id="ver" style="float:right;opacity:.6">v2.4</span>TV and TeleRadyo channels are the broadcasters' own free, official livestreams. AM/FM stations come from the open Radio Browser directory (the same public station list many radio apps use) and play as audio inside this app. AI Films are curated from Hollywood.ai's free showcase and play from each creator's own YouTube upload; series play all episodes in order. AI Drama shows the videos of hand-picked Dailymotion channels, played in Dailymotion's own player. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Networks decide where their streams can play, so some may be unavailable outside the Philippines or outside YouTube; the app marks those for you.</footer>
+<footer><span id="ver" style="float:right;opacity:.6">v2.5</span>TV and TeleRadyo channels are the broadcasters' own free, official livestreams. AM/FM stations come from the open Radio Browser directory (the same public station list many radio apps use) and play as audio inside this app. AI Films are curated from Hollywood.ai's free showcase and play from each creator's own YouTube upload; series play all episodes in order. AI Drama is a browsable catalog of Bronze Terrace Screen's full-length dramas; Dailymotion doesn't allow its player on outside sites, so those open on Dailymotion. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Networks decide where their streams can play, so some may be unavailable outside the Philippines or outside YouTube; the app marks those for you.</footer>
 
 <div id="probes" aria-hidden="true"></div>
 <section id="player" aria-modal="true" role="dialog">
@@ -194,19 +199,20 @@ function renderTabs(){
     const b = document.createElement("button");
     b.className="tab"; b.role="tab"; b.textContent=cat;
     b.setAttribute("aria-selected", cat===curCat);
-    b.onclick=()=>{curCat=cat; renderTabs(); renderGrid(); focusCard(0); if(cat==="AI Drama") setStatus(dramaStatus||"Loading channel videos…"); else if(typeof refreshStatus==="function"&&CHANNELS.some(c=>c.id)) refreshStatus();};
+    b.onclick=()=>{curCat=cat; renderTabs(); renderGrid(); focusCard(0); document.getElementById("dramaSearch").hidden=cat!=="AI Drama"; if(cat==="AI Drama") setStatus(dramaStatus||"Loading drama catalog…"); else if(typeof refreshStatus==="function"&&CHANNELS.some(c=>c.id)) refreshStatus();};
     tabs.appendChild(b);
   });
 }
 function renderGrid(){
   grid.innerHTML="";
   visible().forEach((ch,i)=>{
-    const b=document.createElement("button");
+    const b=document.createElement(ch.ext?"a":"button");
+    if(ch.ext){ b.href=ch.ext; b.target="_blank"; b.rel="noopener"; b.style.textDecoration="none"; b.style.display="block"; }
     b.className="card"+(ch.radio?" radio":"")+(ch.fm?" fm":"")+(ch.dm?" dm":"")+(ch.pick?" pickc":"")+(ch.chan?" chanc":"")+(ch.film?" dm filmc":""); b.dataset.i=CHANNELS.indexOf(ch);
-    b.innerHTML=`<span class="live">${ch.noEmbed?"NO EMBED":ch.film?(ch.film.pl?"SERIES · "+ch.film.pl.length+" EPS":"FILM"):ch.pick?"★ PICK":ch.chan?"CHANNEL":ch.dm?"AI DRAMA":ch.fm?"ON AIR":ch.radio?"RADIO":"● LIVE"}</span>
+    b.innerHTML=`<span class="live">${ch.ext?"▶ DAILYMOTION":ch.noEmbed?"NO EMBED":ch.film?(ch.film.pl?"SERIES · "+ch.film.pl.length+" EPS":"FILM"):ch.pick?"★ PICK":ch.chan?"CHANNEL":ch.dm?"AI DRAMA":ch.fm?"ON AIR":ch.radio?"RADIO":"● LIVE"}</span>
       <div class="tile" style="background:linear-gradient(135deg,${ch.c.join(",")})">${ch.logo?`<img class="logo" src="${ch.logo}" alt="" onerror="this.remove()">`:""}<span>${ch.net}</span></div>
       <div class="meta"><p class="name">${i+1}. ${ch.n}</p><p class="desc">${ch.d}</p></div>`;
-    b.onclick=()=>play(+b.dataset.i);
+    if(!ch.ext) b.onclick=()=>play(+b.dataset.i);
     grid.appendChild(b);
   });
   if(typeof markCards==="function") markCards();
@@ -253,7 +259,7 @@ function closePlayer(){
   if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
   const card=grid.querySelector(`[data-i="${curIdx}"]`); (card||grid.firstChild)?.focus();
 }
-function zap(d){ const n=CHANNELS.length; let j=curIdx; for(let k=0;k<n;k++){ j=(j+d+n)%n; if(showAll||!CHANNELS[j].bad) break; } play(j); }
+function zap(d){ const n=CHANNELS.length; let j=curIdx; for(let k=0;k<n;k++){ j=(j+d+n)%n; if(!CHANNELS[j].ext&&(showAll||!CHANNELS[j].bad)) break; } play(j); }
 
 $("#backBtn").onclick=closePlayer;
 $("#prevBtn").onclick=()=>zap(-1);
@@ -278,7 +284,7 @@ document.addEventListener("keydown",e=>{
     }
     return;
   }
-  if(/^[1-9]$/.test(k)){ const ch=visible()[+k-1]; if(ch){ play(CHANNELS.indexOf(ch)); } return; }
+  if(/^[1-9]$/.test(k)){ const ch=visible()[+k-1]; if(ch&&!ch.ext){ play(CHANNELS.indexOf(ch)); } return; }
   const cards=[...grid.children], tabBtns=[...tabs.children];
   const a=document.activeElement;
   if(tabBtns.includes(a)){
@@ -330,7 +336,7 @@ function showUnavailable(i,code){
 function markCards(){ grid.querySelectorAll(".card").forEach(c=>{
   const ch=CHANNELS[+c.dataset.i]; const l=c.querySelector(".live");
   if(ch.bad){ c.classList.add("bad"); l.textContent=ch.bad==="geo"?"BLOCKED HERE":"NOT LIVE NOW"; l.style.background="#555"; }
-  else { c.classList.remove("bad"); l.textContent=ch.noEmbed?"NO EMBED":ch.film?(ch.film.pl?"SERIES · "+ch.film.pl.length+" EPS":"FILM"):ch.pick?"★ PICK":ch.chan?"CHANNEL":ch.dm?"AI DRAMA":ch.fm?"ON AIR":ch.radio?"RADIO":"● LIVE"; l.style.background=""; } }); }
+  else { c.classList.remove("bad"); l.textContent=ch.ext?"▶ DAILYMOTION":ch.noEmbed?"NO EMBED":ch.film?(ch.film.pl?"SERIES · "+ch.film.pl.length+" EPS":"FILM"):ch.pick?"★ PICK":ch.chan?"CHANNEL":ch.dm?"AI DRAMA":ch.fm?"ON AIR":ch.radio?"RADIO":"● LIVE"; l.style.background=""; } }); }
 
 /* ---- Self-test: on this device, quietly try every channel and hide the ones that can't play here ---- */
 const PROBE_TTL=6*3600*1000, PROBE_KEY="pinoytv-probe-v1";
@@ -575,44 +581,31 @@ AI_FILMS.forEach(f=>{ const first=f.yt||f.pl[0];
   CHANNELS.push({n:f.n, net:f.pl?"SERIES":"FILM", cat:"AI Films", film:f, logo:`https://i.ytimg.com/vi/${first}/hqdefault.jpg`,
     d:`${f.len} · ${f.g} · ${f.by}`, c:["#1b1b2f","#e94560"]}); });
 
-/* ---- Curated Dailymotion channels: every public video from these uploaders, newest first ---- */
-const DM_CHANNELS=["BronzeTerraceScreen"];
-async function loadDmChannels(){
+/* ---- AI Drama catalog: Bronze Terrace Screen on Dailymotion. Dailymotion no longer allows embedding on
+   outside sites, so these cards open the video on Dailymotion (app or site) instead of playing in-app. ---- */
+const DM_CATALOG_URL="bronze.json", DM_OWNER="Bronze Terrace Screen";
+let dramaAll=[], dramaQuery="";
+async function loadDramaCatalog(){
   if(!canEmbed) return;
-  for(const user of DM_CHANNELS){
-    try{
-      let page=1, added=0, seen=new Set();
-      while(page<=3){
-        const F="fields=id,title,thumbnail_360_url,views_total,duration,owner.screenname,created_time,allow_embed,status";
-        let r=await fetch(`https://api.dailymotion.com/user/${encodeURIComponent(user)}/videos?sort=recent&limit=100&page=${page}&${F}`);
-        let j=r.ok?await r.json():{error:{message:"HTTP "+r.status}};
-        if(j.error){ r=await fetch(`https://api.dailymotion.com/videos?owner=${encodeURIComponent(user)}&sort=recent&limit=100&page=${page}&${F}`);
-          j=r.ok?await r.json():{error:{message:"HTTP "+r.status}}; }
-        if(j.error) throw new Error(j.error.message||"API error");
-        if(page===1&&!(j.list||[]).length) throw new Error("channel found but returned 0 videos");
-        const batch=[];
-        for(const v of (j.list||[])){
-          if(!v.duration||v.duration<60) continue;
-          const key=v.title.toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,60);
-          if(seen.has(key)) continue; seen.add(key);
-          batch.push({n:v.title.trim(), net:v["owner.screenname"]||user, cat:"AI Drama", dm:v.id, chan:true, noEmbed:v.allow_embed===false, logo:v.thumbnail_360_url,
-            d:`${fmtViews(v.views_total)} views · ${Math.round(v.duration/60)} min · ${new Date(v.created_time*1000).toLocaleDateString()}`, c:["#0b6e4f","#08a045"]});
-        }
-        // drop copies that the keyword search already pulled in, then insert after the ★ picks
-        const ids=new Set(batch.map(b=>b.dm));
-        for(let i=CHANNELS.length-1;i>=0;i--) if(CHANNELS[i].dm&&!CHANNELS[i].pick&&!CHANNELS[i].chan&&ids.has(CHANNELS[i].dm)) CHANNELS.splice(i,1);
-        let at=CHANNELS.findIndex(c=>c.dm&&!c.pick); if(at<0) at=CHANNELS.length;
-        CHANNELS.splice(at+added,0,...batch); added+=batch.length;
-        if(!j.has_more) break; page++;
-      }
-      renderGrid(); markCards();
-      const ne=CHANNELS.filter(c=>c.chan&&c.noEmbed).length, tot=CHANNELS.filter(c=>c.chan).length;
-      setDramaStatus(ne?`${tot} videos from ${user} · ${ne} can't be played outside Dailymotion (uploader setting)`:`${tot} videos from ${user}`);
-    }catch(e){ setDramaStatus(`Couldn't load channel "${user}": ${e.message}`); }
-  }
+  try{
+    const r=await fetch(DM_CATALOG_URL); if(!r.ok) throw new Error("HTTP "+r.status);
+    const rows=await r.json();
+    dramaAll=rows.map(([id,title,dur,created,thumb])=>({n:title, net:DM_OWNER, cat:"AI Drama", dm:id, ext:`https://www.dailymotion.com/video/${id}`,
+      logo:"https://"+thumb, d:`${Math.round(dur/60)} min · ${new Date(created*1000).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"})}`, c:["#0b6e4f","#08a045"]}));
+    applyDramaFilter();
+    setDramaStatus(`${dramaAll.length} dramas from ${DM_OWNER} · tap one to watch on Dailymotion`);
+  }catch(e){ setDramaStatus("Couldn't load the drama catalog ("+e.message+")."); }
 }
+function applyDramaFilter(){
+  for(let i=CHANNELS.length-1;i>=0;i--) if(CHANNELS[i].dm) CHANNELS.splice(i,1);
+  const q=dramaQuery.trim().toLowerCase();
+  const list=q?dramaAll.filter(d=>d.n.toLowerCase().includes(q)):dramaAll;
+  CHANNELS.push(...list.slice(0,300)); renderGrid(); markCards();
+}
+document.getElementById("dramaSearch").addEventListener("input",e=>{ dramaQuery=e.target.value; applyDramaFilter();
+  setDramaStatus(dramaQuery?`${CHANNELS.filter(c=>c.dm).length} matches`:`${dramaAll.length} dramas from ${DM_OWNER} · tap one to watch on Dailymotion`); });
 
-renderTabs(); renderGrid(); focusCard(0); probeAll(false); loadFM(); loadDmChannels();
+renderTabs(); renderGrid(); focusCard(0); probeAll(false); loadFM(); loadDramaCatalog();
 </script>
 </body>
 </html>

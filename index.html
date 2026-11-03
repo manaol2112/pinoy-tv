@@ -108,7 +108,7 @@
   <div class="grid" id="grid"></div>
   <p class="hint">Works with a TV remote or keyboard: <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> to move, <kbd>OK</kbd>/<kbd>Enter</kbd> to watch, <kbd>Back</kbd>/<kbd>Esc</kbd> to return. Number keys jump straight to a channel. When the app opens it checks every channel on your device and hides the ones that cannot play here; use <b>Show hidden</b> to see them anyway.</p>
 </main>
-<footer><span id="ver" style="float:right;opacity:.6">v2.3</span>TV and TeleRadyo channels are the broadcasters' own free, official livestreams. AM/FM stations come from the open Radio Browser directory (the same public station list many radio apps use) and play as audio inside this app. AI Films are curated from Hollywood.ai's free showcase and play from each creator's own YouTube upload; series play all episodes in order. AI Drama shows the videos of hand-picked Dailymotion channels, played in Dailymotion's own player. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Networks decide where their streams can play, so some may be unavailable outside the Philippines or outside YouTube; the app marks those for you.</footer>
+<footer><span id="ver" style="float:right;opacity:.6">v2.4</span>TV and TeleRadyo channels are the broadcasters' own free, official livestreams. AM/FM stations come from the open Radio Browser directory (the same public station list many radio apps use) and play as audio inside this app. AI Films are curated from Hollywood.ai's free showcase and play from each creator's own YouTube upload; series play all episodes in order. AI Drama shows the videos of hand-picked Dailymotion channels, played in Dailymotion's own player. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Networks decide where their streams can play, so some may be unavailable outside the Philippines or outside YouTube; the app marks those for you.</footer>
 
 <div id="probes" aria-hidden="true"></div>
 <section id="player" aria-modal="true" role="dialog">
@@ -194,7 +194,7 @@ function renderTabs(){
     const b = document.createElement("button");
     b.className="tab"; b.role="tab"; b.textContent=cat;
     b.setAttribute("aria-selected", cat===curCat);
-    b.onclick=()=>{curCat=cat; renderTabs(); renderGrid(); focusCard(0); if(cat==="AI Drama"&&pickReport.ok.length+pickReport.rejected.length) setStatus(`${pickReport.ok.length} of ${DM_PICKS.length} picks verified playable · ${pickReport.rejected.length} dropped`); else if(typeof refreshStatus==="function"&&CHANNELS.some(c=>c.id)) refreshStatus();};
+    b.onclick=()=>{curCat=cat; renderTabs(); renderGrid(); focusCard(0); if(cat==="AI Drama") setStatus(dramaStatus||"Loading channel videos…"); else if(typeof refreshStatus==="function"&&CHANNELS.some(c=>c.id)) refreshStatus();};
     tabs.appendChild(b);
   });
 }
@@ -337,8 +337,11 @@ const PROBE_TTL=6*3600*1000, PROBE_KEY="pinoytv-probe-v1";
 function saveProbe(){ try{ localStorage.setItem(PROBE_KEY, JSON.stringify({t:Date.now(), bad:Object.fromEntries(CHANNELS.map(c=>[c.id,c.bad||null]))})); }catch(e){} }
 function loadProbe(){ try{ const o=JSON.parse(localStorage.getItem(PROBE_KEY)||"null"); if(!o||Date.now()-o.t>PROBE_TTL) return false;
   CHANNELS.forEach(c=>{ c.bad=o.bad[c.id]||null; }); return true; }catch(e){ return false; } }
+let dramaStatus="";
 function setStatus(html, busy){ const t=document.getElementById("statusText"); t.innerHTML=(busy?'<span class="dot"></span>':"")+html; }
+function setDramaStatus(html){ dramaStatus=html; if(curCat==="AI Drama") setStatus(html); }
 function refreshStatus(){
+  if(curCat==="AI Drama"){ setStatus(dramaStatus||"Loading channel videos…"); return; }
   const hidden=CHANNELS.filter(c=>c.bad).length, ok=CHANNELS.length-hidden;
   const sa=document.getElementById("showAllBtn"), rb=document.getElementById("recheckBtn");
   sa.hidden=!hidden; rb.hidden=false; sa.textContent=showAll?`Hide unavailable (${hidden})`:`Show hidden (${hidden})`;
@@ -580,8 +583,13 @@ async function loadDmChannels(){
     try{
       let page=1, added=0, seen=new Set();
       while(page<=3){
-        const u=`https://api.dailymotion.com/user/${encodeURIComponent(user)}/videos?sort=recent&limit=100&page=${page}&fields=id,title,thumbnail_360_url,views_total,duration,owner.screenname,created_time,allow_embed,status`;
-        const r=await fetch(u); if(!r.ok) throw new Error("HTTP "+r.status); const j=await r.json(); if(j.error) throw new Error(j.error.message);
+        const F="fields=id,title,thumbnail_360_url,views_total,duration,owner.screenname,created_time,allow_embed,status";
+        let r=await fetch(`https://api.dailymotion.com/user/${encodeURIComponent(user)}/videos?sort=recent&limit=100&page=${page}&${F}`);
+        let j=r.ok?await r.json():{error:{message:"HTTP "+r.status}};
+        if(j.error){ r=await fetch(`https://api.dailymotion.com/videos?owner=${encodeURIComponent(user)}&sort=recent&limit=100&page=${page}&${F}`);
+          j=r.ok?await r.json():{error:{message:"HTTP "+r.status}}; }
+        if(j.error) throw new Error(j.error.message||"API error");
+        if(page===1&&!(j.list||[]).length) throw new Error("channel found but returned 0 videos");
         const batch=[];
         for(const v of (j.list||[])){
           if(!v.duration||v.duration<60) continue;
@@ -599,8 +607,8 @@ async function loadDmChannels(){
       }
       renderGrid(); markCards();
       const ne=CHANNELS.filter(c=>c.chan&&c.noEmbed).length, tot=CHANNELS.filter(c=>c.chan).length;
-      if(curCat==="AI Drama") setStatus(ne?`${tot} videos from ${user} · ${ne} can't be played outside Dailymotion (uploader setting)`:`${tot} videos from ${user}`);
-    }catch(e){ setStatus(`Couldn't load channel ${user} (${e.message}).`); }
+      setDramaStatus(ne?`${tot} videos from ${user} · ${ne} can't be played outside Dailymotion (uploader setting)`:`${tot} videos from ${user}`);
+    }catch(e){ setDramaStatus(`Couldn't load channel "${user}": ${e.message}`); }
   }
 }
 

@@ -52,6 +52,7 @@
   .card.dm .live{background:#7b2cbf}
   .card.dm.pickc .live{background:#ff9f1c;color:#000}
   .card.filmc .live{background:#e94560}
+  .card.chanc .live{background:#08a045}
   .card.dm .tile .logo{object-fit:cover;padding:0}
   .card.dm .tile span{position:absolute;left:10px;bottom:8px;font-size:16px;background:#0009;padding:2px 8px;border-radius:6px}
   .live{position:absolute;top:10px;left:10px;background:var(--red);color:#fff;font-size:11px;font-weight:700;
@@ -107,7 +108,7 @@
   <div class="grid" id="grid"></div>
   <p class="hint">Works with a TV remote or keyboard: <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> to move, <kbd>OK</kbd>/<kbd>Enter</kbd> to watch, <kbd>Back</kbd>/<kbd>Esc</kbd> to return. Number keys jump straight to a channel. When the app opens it checks every channel on your device and hides the ones that cannot play here; use <b>Show hidden</b> to see them anyway.</p>
 </main>
-<footer><span id="ver" style="float:right;opacity:.6">v2.0</span>TV and TeleRadyo channels are the broadcasters' own free, official livestreams. AM/FM stations come from the open Radio Browser directory (the same public station list many radio apps use) and play as audio inside this app. AI Films are curated from Hollywood.ai's free showcase and play from each creator's own YouTube upload; series play all episodes in order. AI Drama shows the most-viewed AI-generated dramas on Dailymotion, played in Dailymotion's own player. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Networks decide where their streams can play, so some may be unavailable outside the Philippines or outside YouTube; the app marks those for you.</footer>
+<footer><span id="ver" style="float:right;opacity:.6">v2.1</span>TV and TeleRadyo channels are the broadcasters' own free, official livestreams. AM/FM stations come from the open Radio Browser directory (the same public station list many radio apps use) and play as audio inside this app. AI Films are curated from Hollywood.ai's free showcase and play from each creator's own YouTube upload; series play all episodes in order. AI Drama shows the most-viewed AI-generated dramas on Dailymotion, played in Dailymotion's own player. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Networks decide where their streams can play, so some may be unavailable outside the Philippines or outside YouTube; the app marks those for you.</footer>
 
 <div id="probes" aria-hidden="true"></div>
 <section id="player" aria-modal="true" role="dialog">
@@ -201,8 +202,8 @@ function renderGrid(){
   grid.innerHTML="";
   visible().forEach((ch,i)=>{
     const b=document.createElement("button");
-    b.className="card"+(ch.radio?" radio":"")+(ch.fm?" fm":"")+(ch.dm?" dm":"")+(ch.pick?" pickc":"")+(ch.film?" dm filmc":""); b.dataset.i=CHANNELS.indexOf(ch);
-    b.innerHTML=`<span class="live">${ch.film?(ch.film.pl?"SERIES · "+ch.film.pl.length+" EPS":"FILM"):ch.pick?"★ PICK":ch.dm?"AI DRAMA":ch.fm?"ON AIR":ch.radio?"RADIO":"● LIVE"}</span>
+    b.className="card"+(ch.radio?" radio":"")+(ch.fm?" fm":"")+(ch.dm?" dm":"")+(ch.pick?" pickc":"")+(ch.chan?" chanc":"")+(ch.film?" dm filmc":""); b.dataset.i=CHANNELS.indexOf(ch);
+    b.innerHTML=`<span class="live">${ch.film?(ch.film.pl?"SERIES · "+ch.film.pl.length+" EPS":"FILM"):ch.pick?"★ PICK":ch.chan?"CHANNEL":ch.dm?"AI DRAMA":ch.fm?"ON AIR":ch.radio?"RADIO":"● LIVE"}</span>
       <div class="tile" style="background:linear-gradient(135deg,${ch.c.join(",")})">${ch.logo?`<img class="logo" src="${ch.logo}" alt="" onerror="this.remove()">`:""}<span>${ch.net}</span></div>
       <div class="meta"><p class="name">${i+1}. ${ch.n}</p><p class="desc">${ch.d}</p></div>`;
     b.onclick=()=>play(+b.dataset.i);
@@ -324,7 +325,7 @@ function showUnavailable(i,code){
 function markCards(){ grid.querySelectorAll(".card").forEach(c=>{
   const ch=CHANNELS[+c.dataset.i]; const l=c.querySelector(".live");
   if(ch.bad){ c.classList.add("bad"); l.textContent=ch.bad==="geo"?"BLOCKED HERE":"NOT LIVE NOW"; l.style.background="#555"; }
-  else { c.classList.remove("bad"); l.textContent=ch.film?(ch.film.pl?"SERIES · "+ch.film.pl.length+" EPS":"FILM"):ch.pick?"★ PICK":ch.dm?"AI DRAMA":ch.fm?"ON AIR":ch.radio?"RADIO":"● LIVE"; l.style.background=""; } }); }
+  else { c.classList.remove("bad"); l.textContent=ch.film?(ch.film.pl?"SERIES · "+ch.film.pl.length+" EPS":"FILM"):ch.pick?"★ PICK":ch.chan?"CHANNEL":ch.dm?"AI DRAMA":ch.fm?"ON AIR":ch.radio?"RADIO":"● LIVE"; l.style.background=""; } }); }
 
 /* ---- Self-test: on this device, quietly try every channel and hide the ones that can't play here ---- */
 const PROBE_TTL=6*3600*1000, PROBE_KEY="pinoytv-probe-v1";
@@ -566,7 +567,37 @@ AI_FILMS.forEach(f=>{ const first=f.yt||f.pl[0];
   CHANNELS.push({n:f.n, net:f.pl?"SERIES":"FILM", cat:"AI Films", film:f, logo:`https://i.ytimg.com/vi/${first}/hqdefault.jpg`,
     d:`${f.len} · ${f.g} · ${f.by}`, c:["#1b1b2f","#e94560"]}); });
 
-renderTabs(); renderGrid(); focusCard(0); probeAll(false); loadFM(); loadDramas().then(loadPicks);
+/* ---- Curated Dailymotion channels: every public video from these uploaders, newest first ---- */
+const DM_CHANNELS=["BronzeTerraceScreen"];
+async function loadDmChannels(){
+  if(!canEmbed) return;
+  for(const user of DM_CHANNELS){
+    try{
+      let page=1, added=0, seen=new Set();
+      while(page<=3){
+        const u=`https://api.dailymotion.com/user/${encodeURIComponent(user)}/videos?sort=recent&limit=100&page=${page}&fields=id,title,thumbnail_360_url,views_total,duration,owner.screenname,created_time`;
+        const r=await fetch(u); if(!r.ok) throw new Error("HTTP "+r.status); const j=await r.json(); if(j.error) throw new Error(j.error.message);
+        const batch=[];
+        for(const v of (j.list||[])){
+          if(!v.duration||v.duration<60) continue;
+          const key=v.title.toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,60);
+          if(seen.has(key)) continue; seen.add(key);
+          batch.push({n:v.title.trim(), net:v["owner.screenname"]||user, cat:"AI Drama", dm:v.id, chan:true, logo:v.thumbnail_360_url,
+            d:`${fmtViews(v.views_total)} views · ${Math.round(v.duration/60)} min · ${new Date(v.created_time*1000).toLocaleDateString()}`, c:["#0b6e4f","#08a045"]});
+        }
+        // drop copies that the keyword search already pulled in, then insert after the ★ picks
+        const ids=new Set(batch.map(b=>b.dm));
+        for(let i=CHANNELS.length-1;i>=0;i--) if(CHANNELS[i].dm&&!CHANNELS[i].pick&&!CHANNELS[i].chan&&ids.has(CHANNELS[i].dm)) CHANNELS.splice(i,1);
+        let at=CHANNELS.findIndex(c=>c.dm&&!c.pick); if(at<0) at=CHANNELS.length;
+        CHANNELS.splice(at+added,0,...batch); added+=batch.length;
+        if(!j.has_more) break; page++;
+      }
+      renderGrid(); markCards();
+    }catch(e){ setStatus(`Couldn't load channel ${user} (${e.message}).`); }
+  }
+}
+
+renderTabs(); renderGrid(); focusCard(0); probeAll(false); loadFM(); loadDramas().then(loadPicks).then(loadDmChannels);
 </script>
 </body>
 </html>

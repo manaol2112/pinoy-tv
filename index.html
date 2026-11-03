@@ -41,12 +41,14 @@
     transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}
   .card:hover,.card:focus-visible,.card.kfocus{outline:none;border-color:var(--focus);transform:scale(1.03);
     box-shadow:0 12px 30px #0008}
-  .tile{height:120px;display:flex;align-items:center;justify-content:center;
+  .tile .logo{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:14px;background:#0b0f1a}
+  .tile{position:relative;height:120px;display:flex;align-items:center;justify-content:center;
     font-weight:800;font-size:30px;letter-spacing:.5px;color:#fff;text-shadow:0 2px 10px #0006}
   .meta{padding:12px 14px 14px}
   .name{font-size:17px;font-weight:650;margin:0 0 4px}
   .desc{font-size:13px;color:var(--muted);margin:0;line-height:1.35}
   .card.radio .live{background:#1d4ed8}
+  .card.fm .live{background:#0a9396}
   .live{position:absolute;top:10px;left:10px;background:var(--red);color:#fff;font-size:11px;font-weight:700;
     padding:3px 8px;border-radius:6px;letter-spacing:.6px}
   .hint{color:var(--muted);font-size:13px;margin:22px 0 0;line-height:1.5}
@@ -63,6 +65,15 @@
   .pbtn:focus-visible,.pbtn.kfocus{outline:none;border-color:#fff}
   .ptitle{flex:1;font-weight:600;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #frameWrap{flex:1;display:flex}
+  #radioWrap{flex:1;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;
+    background:radial-gradient(ellipse at 50% 80%, var(--glow,#0a9396) 0%, #000 60%)}
+  #viz{position:absolute;inset:0;width:100%;height:100%}
+  .rinfo{position:relative;text-align:center;padding:24px;max-width:800px}
+  .rbadge{display:inline-block;background:var(--red);color:#fff;font-weight:800;letter-spacing:2px;padding:6px 14px;border-radius:8px;
+    font-size:14px;animation:pulse 1.6s infinite}
+  .rinfo h2{font-size:clamp(28px,5vw,64px);margin:16px 0 6px;text-shadow:0 4px 30px #000}
+  .rinfo p{color:#dfe4f0;margin:0;font-size:clamp(14px,2vw,20px)}
+  .rstate{color:var(--muted)!important;font-size:14px!important;margin-top:10px!important}
   #frameWrap iframe{border:0;width:100%;height:100%}
   .offline{margin:auto;max-width:520px;text-align:center;padding:24px;color:var(--muted);line-height:1.6}
   .offline h2{color:var(--text);margin:0 0 8px}
@@ -90,7 +101,7 @@
   <div class="grid" id="grid"></div>
   <p class="hint">Works with a TV remote or keyboard: <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> to move, <kbd>OK</kbd>/<kbd>Enter</kbd> to watch, <kbd>Back</kbd>/<kbd>Esc</kbd> to return. Number keys jump straight to a channel. When the app opens it checks every channel on your device and hides the ones that cannot play here; use <b>Show hidden</b> to see them anyway.</p>
 </main>
-<footer>Every TV channel and radio station here is the broadcaster's own free, official livestream, played inside this app. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Networks decide where their streams can play, so some may be unavailable outside the Philippines or outside YouTube; the app marks those for you.</footer>
+<footer>TV and TeleRadyo channels are the broadcasters' own free, official livestreams. AM/FM stations come from the open Radio Browser directory (the same public station list many radio apps use) and play as audio inside this app. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Networks decide where their streams can play, so some may be unavailable outside the Philippines or outside YouTube; the app marks those for you.</footer>
 
 <div id="probes" aria-hidden="true"></div>
 <section id="player" aria-modal="true" role="dialog">
@@ -102,6 +113,16 @@
     <button class="pbtn" id="fsBtn">Fullscreen</button>
   </div>
   <div id="frameWrap"></div>
+  <div id="radioWrap" hidden>
+    <canvas id="viz"></canvas>
+    <div class="rinfo">
+      <div class="rbadge">ON AIR</div>
+      <h2 id="rname"></h2>
+      <p id="rmeta"></p>
+      <p id="rstate" class="rstate">Tuning in…</p>
+    </div>
+    <audio id="radio" preload="none" playsinline></audio>
+  </div>
 </section>
 
 <script>
@@ -135,22 +156,22 @@ const CHANNELS = [
   {n:"GMA Public Affairs", net:"GMA", cat:"TV", id:"UCj5RwDivLksanrNvkW0FB4w",
    d:"KMJS, documentaries and public affairs", c:["#f77f00","#6a040f"]},
   // Radio (the stations' own YouTube livestreams)
-  {n:"DZMM TeleRadyo 630", net:"DZMM", cat:"Radio", id:"UCs_VNu-FQ0WcJnD4QkmIL5w", radio:true,
+  {n:"DZMM TeleRadyo 630", net:"DZMM", cat:"TeleRadyo", id:"UCs_VNu-FQ0WcJnD4QkmIL5w", radio:true,
    d:"Radyo Patrol 630, ABS-CBN news and public service radio", c:["#1b4332","#2d6a4f"]},
-  {n:"Super Radyo DZBB 594", net:"DZBB", cat:"Radio", id:"UCYFgnkDYr-G5L_iy6DZdvSA", radio:true,
+  {n:"Super Radyo DZBB 594", net:"DZBB", cat:"TeleRadyo", id:"UCYFgnkDYr-G5L_iy6DZdvSA", radio:true,
    d:"GMA's flagship AM station, Ito ang Balita!", c:["#9d0208","#e85d04"]},
-  {n:"DZRH 666", net:"DZRH", cat:"Radio", id:"UCcTiBX8js_djhSSlmJRI99A", radio:true,
+  {n:"DZRH 666", net:"DZRH", cat:"TeleRadyo", id:"UCcTiBX8js_djhSSlmJRI99A", radio:true,
    d:"DZRH News Television, MBC's flagship AM station, 24/7", c:["#003049","#669bbc"]},
-  {n:"Bombo Radyo", net:"BOMBO", cat:"Radio", id:"UCVVw9u0pZ3nnWxx7WyE8YkQ", radio:true,
+  {n:"Bombo Radyo", net:"BOMBO", cat:"TeleRadyo", id:"UCVVw9u0pZ3nnWxx7WyE8YkQ", radio:true,
    d:"Bombo Radyo Philippines nationwide news and coverage", c:["#000814","#ffc300"]},
-  {n:"Barangay LS 97.1", net:"BARANGAY LS", cat:"Radio", id:"UClbtDsQ1UHd-xlohI5vfKQg", radio:true,
+  {n:"Barangay LS 97.1", net:"BARANGAY LS", cat:"TeleRadyo", id:"UClbtDsQ1UHd-xlohI5vfKQg", radio:true,
    d:"GMA's flagship FM, Barangay Love Stories, Forever!", c:["#7b2cbf","#ff6d00"]},
-  {n:"90.7 Love Radio", net:"LOVE RADIO", cat:"Radio", id:"UC934DvzBQQnB5qBJpc50obg", radio:true,
+  {n:"90.7 Love Radio", net:"LOVE RADIO", cat:"TeleRadyo", id:"UC934DvzBQQnB5qBJpc50obg", radio:true,
    d:"OPM hits and Manila's favorite FM station", c:["#b5179e","#f72585"]},
 ];
 
 
-const CATS = ["All","TV","Radio"];
+const CATS = ["All","TV","TeleRadyo","AM/FM"];
 let curCat = "All", curIdx = -1;
 const $ = s => document.querySelector(s);
 const grid = $("#grid"), tabs = $("#tabs"), player = $("#player"), wrap = $("#frameWrap");
@@ -190,7 +211,7 @@ function showUnavailable(i,code){
 function markCards(){ grid.querySelectorAll(".card").forEach(c=>{
   const ch=CHANNELS[+c.dataset.i]; const l=c.querySelector(".live");
   if(ch.bad){ c.classList.add("bad"); l.textContent=ch.bad==="geo"?"BLOCKED HERE":"NOT LIVE NOW"; l.style.background="#555"; }
-  else { c.classList.remove("bad"); l.textContent=ch.radio?"RADIO":"● LIVE"; l.style.background=""; } }); }
+  else { c.classList.remove("bad"); l.textContent=ch.fm?"ON AIR":ch.radio?"RADIO":"● LIVE"; l.style.background=""; } }); }
 
 /* ---- Self-test: on this device, quietly try every channel and hide the ones that can't play here ---- */
 const PROBE_TTL=6*3600*1000, PROBE_KEY="pinoytv-probe-v1";
@@ -235,7 +256,89 @@ function probeAll(force){
 document.getElementById("showAllBtn").onclick=()=>{ showAll=!showAll; renderGrid(); markCards(); refreshStatus(); focusCard(0); };
 document.getElementById("recheckBtn").onclick=()=>probeAll(true);
 
-renderTabs(); renderGrid(); focusCard(0); probeAll(false);};
+/* ---- AM/FM: live station list from the open Radio Browser directory, played as audio with a visualizer ---- */
+const RB_HOSTS=["https://de1.api.radio-browser.info","https://nl1.api.radio-browser.info","https://at1.api.radio-browser.info","https://all.api.radio-browser.info"];
+const FM_COLORS=[["#0a9396","#005f73"],["#ee9b00","#bb3e03"],["#9b5de5","#f15bb5"],["#00b4d8","#0077b6"],["#e63946","#6a040f"],["#2d6a4f","#95d5b2"],["#ff6d00","#7b2cbf"],["#3a86ff","#8338ec"]];
+async function loadFM(){
+  if(!canEmbed) return;
+  let list=null;
+  for(const h of RB_HOSTS){
+    try{ const r=await fetch(`${h}/json/stations/bycountrycodeexact/PH?order=votes&reverse=true&hidebroken=true&limit=120`);
+      if(r.ok){ list=await r.json(); break; } }catch(e){}
+  }
+  if(!list){ setStatus("AM/FM list couldn't be loaded right now; TV and TeleRadyo still work."); return; }
+  const seen=new Set(); let n=0;
+  for(const st of list){
+    const url=(st.url_resolved||st.url||"").trim();
+    if(!/^https:\/\//i.test(url)) continue;                           // the site is https; http streams would be blocked
+    if(/\.m3u8?$|\.pls$/i.test(url)) continue;                        // playlists need a parser; skip for reliability
+    const key=st.name.toLowerCase().replace(/[^a-z0-9]/g,"");
+    if(!key||seen.has(key)) continue; seen.add(key);
+    const tags=(st.tags||"").toLowerCase();
+    const band=/\bam\b|\bnews\b|balita|radyo|talk/.test(tags+" "+st.name.toLowerCase())?"AM / News-Talk":"FM / Music";
+    CHANNELS.push({n:st.name.trim(), net:(st.name.match(/\d{2,3}\.\d|\d{3,4}\s?khz/i)||[st.name.split(/\s+/)[0]])[0].toUpperCase(),
+      cat:"AM/FM", fm:true, src:url, logo:/^https:/.test(st.favicon||"")?st.favicon:null,
+      d:`${band}${st.state?" · "+st.state:""}${st.bitrate?" · "+st.bitrate+" kbps":""}`, c:FM_COLORS[n++%FM_COLORS.length]});
+    if(n>=48) break;
+  }
+  renderGrid(); markCards(); if(typeof refreshStatus==="function"&&!document.querySelector(".status .dot")) refreshStatus();
+}
+
+/* ---- Radio player ---- */
+const audio=document.getElementById("radio"), rwrap=document.getElementById("radioWrap"), viz=document.getElementById("viz");
+let actx=null, analyser=null, srcNode=null, vizRAF=0, vizReal=false, curFM=null;
+function playRadio(ch){
+  curFM=ch; wrap.innerHTML=""; wrap.style.display="none"; rwrap.hidden=false;
+  rwrap.style.setProperty("--glow", ch.c[0]);
+  $("#rname").textContent=ch.n; $("#rmeta").textContent=ch.d; $("#rstate").textContent="Tuning in…";
+  vizReal=false; startAudio(ch.src, true);
+}
+function startAudio(url, tryCors){
+  audio.pause(); audio.removeAttribute("src"); audio.load();
+  if(tryCors) audio.crossOrigin="anonymous"; else audio.removeAttribute("crossorigin");
+  audio.src=url+(url.includes("?")?"&":"?")+"_t="+Date.now();   // fresh connection each tune
+  audio.onerror=()=>{ if(tryCors){ startAudio(url,false); return; }     // station has no CORS → plain playback, animated bars
+    $("#rstate").textContent="This station isn't responding right now. Try another."; if(curFM){curFM.bad="off"; saveProbe(); markCards();} };
+  audio.onplaying=()=>{ $("#rstate").textContent="Live"; if(tryCors) hookAnalyser(); };
+  audio.onwaiting=()=>{ $("#rstate").textContent="Buffering…"; };
+  audio.play().catch(()=>{ $("#rstate").textContent="Press OK / tap to start audio"; });
+  startViz();
+}
+function hookAnalyser(){
+  try{
+    if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)();
+    if(!srcNode){ srcNode=actx.createMediaElementSource(audio); analyser=actx.createAnalyser(); analyser.fftSize=256;
+      srcNode.connect(analyser); analyser.connect(actx.destination); }
+    if(actx.state==="suspended") actx.resume();
+    vizReal=true;
+  }catch(e){ vizReal=false; }
+}
+function stopRadio(){
+  if(!curFM && rwrap.hidden) return;
+  cancelAnimationFrame(vizRAF); audio.pause(); audio.removeAttribute("src"); audio.load();
+  rwrap.hidden=true; wrap.style.display=""; curFM=null;
+}
+function startViz(){
+  cancelAnimationFrame(vizRAF);
+  const c=viz.getContext("2d"); const N=48; const data=new Uint8Array(128); let t=0;
+  const draw=()=>{
+    const W=viz.width=viz.clientWidth, H=viz.height=viz.clientHeight; c.clearRect(0,0,W,H);
+    const col=getComputedStyle(rwrap).getPropertyValue("--glow").trim()||"#0a9396";
+    let bars=[];
+    if(vizReal&&analyser){ analyser.getByteFrequencyData(data); for(let i=0;i<N;i++) bars.push(data[Math.floor(i*data.length/N*0.6)]/255); }
+    else { t+=0.03; const playing=!audio.paused; for(let i=0;i<N;i++){ const v=0.25+0.35*Math.abs(Math.sin(t*1.3+i*0.35))*Math.abs(Math.cos(t*0.7-i*0.2))+0.15*Math.random(); bars.push(playing?v:v*0.25); } }
+    const bw=W/N; const grad=c.createLinearGradient(0,H,0,H*0.3); grad.addColorStop(0,col); grad.addColorStop(1,"#ffffff");
+    c.fillStyle=grad; c.globalAlpha=0.85;
+    bars.forEach((v,i)=>{ const h=Math.max(4,v*H*0.55); c.beginPath(); c.roundRect(i*bw+bw*0.2,H-h,bw*0.6,h,6); c.fill(); });
+    // mirrored glow
+    c.globalAlpha=0.18; bars.forEach((v,i)=>{ const h=v*H*0.2; c.fillRect(i*bw+bw*0.2,H*0.999,bw*0.6,-h*0.5); });
+    c.globalAlpha=1; vizRAF=requestAnimationFrame(draw);
+  }; draw();
+}
+player.addEventListener("click",()=>{ if(curFM&&audio.paused) audio.play().catch(()=>{}); });
+document.addEventListener("keydown",e=>{ if(curFM&&(e.key==="Enter"||e.key===" ")&&audio.paused){ audio.play().catch(()=>{}); } });
+
+renderTabs(); renderGrid(); focusCard(0); probeAll(false); loadFM();};
     tabs.appendChild(b);
   });
 }
@@ -243,9 +346,9 @@ function renderGrid(){
   grid.innerHTML="";
   visible().forEach((ch,i)=>{
     const b=document.createElement("button");
-    b.className="card"+(ch.radio?" radio":""); b.dataset.i=CHANNELS.indexOf(ch);
-    b.innerHTML=`<span class="live">${ch.radio?"RADIO":"● LIVE"}</span>
-      <div class="tile" style="background:linear-gradient(135deg,${ch.c.join(",")})">${ch.net}</div>
+    b.className="card"+(ch.radio?" radio":"")+(ch.fm?" fm":""); b.dataset.i=CHANNELS.indexOf(ch);
+    b.innerHTML=`<span class="live">${ch.fm?"ON AIR":ch.radio?"RADIO":"● LIVE"}</span>
+      <div class="tile" style="background:linear-gradient(135deg,${ch.c.join(",")})">${ch.logo?`<img class="logo" src="${ch.logo}" alt="" onerror="this.remove()">`:""}<span>${ch.net}</span></div>
       <div class="meta"><p class="name">${i+1}. ${ch.n}</p><p class="desc">${ch.d}</p></div>`;
     b.onclick=()=>play(+b.dataset.i);
     grid.appendChild(b);
@@ -257,6 +360,8 @@ function focusCard(i){ const cards=[...grid.children]; if(cards[i]) cards[i].foc
 function play(i){
   curIdx=i; const ch=CHANNELS[i];
   $("#ptitle").textContent=`${ch.n} · ${ch.net}`;
+  stopRadio();
+  if(ch.fm){ playRadio(ch); player.classList.add("open"); $("#backBtn").focus(); wake(); return; }
   if(!canEmbed){
     wrap.innerHTML=`<div class="offline"><h2>${ch.n}</h2>
       <p>To watch inside the app, open Pinoy TV from a web address instead of a saved file (for example, after uploading it to Netlify Drop or GitHub Pages).</p></div>`;
@@ -270,6 +375,7 @@ function play(i){
   $("#backBtn").focus(); wake();
 }
 function closePlayer(){
+  stopRadio();
   player.classList.remove("open"); wrap.innerHTML="";
   if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
   const card=grid.querySelector(`[data-i="${curIdx}"]`); (card||grid.firstChild)?.focus();
@@ -351,7 +457,7 @@ function showUnavailable(i,code){
 function markCards(){ grid.querySelectorAll(".card").forEach(c=>{
   const ch=CHANNELS[+c.dataset.i]; const l=c.querySelector(".live");
   if(ch.bad){ c.classList.add("bad"); l.textContent=ch.bad==="geo"?"BLOCKED HERE":"NOT LIVE NOW"; l.style.background="#555"; }
-  else { c.classList.remove("bad"); l.textContent=ch.radio?"RADIO":"● LIVE"; l.style.background=""; } }); }
+  else { c.classList.remove("bad"); l.textContent=ch.fm?"ON AIR":ch.radio?"RADIO":"● LIVE"; l.style.background=""; } }); }
 
 /* ---- Self-test: on this device, quietly try every channel and hide the ones that can't play here ---- */
 const PROBE_TTL=6*3600*1000, PROBE_KEY="pinoytv-probe-v1";
@@ -396,7 +502,89 @@ function probeAll(force){
 document.getElementById("showAllBtn").onclick=()=>{ showAll=!showAll; renderGrid(); markCards(); refreshStatus(); focusCard(0); };
 document.getElementById("recheckBtn").onclick=()=>probeAll(true);
 
-renderTabs(); renderGrid(); focusCard(0); probeAll(false);
+/* ---- AM/FM: live station list from the open Radio Browser directory, played as audio with a visualizer ---- */
+const RB_HOSTS=["https://de1.api.radio-browser.info","https://nl1.api.radio-browser.info","https://at1.api.radio-browser.info","https://all.api.radio-browser.info"];
+const FM_COLORS=[["#0a9396","#005f73"],["#ee9b00","#bb3e03"],["#9b5de5","#f15bb5"],["#00b4d8","#0077b6"],["#e63946","#6a040f"],["#2d6a4f","#95d5b2"],["#ff6d00","#7b2cbf"],["#3a86ff","#8338ec"]];
+async function loadFM(){
+  if(!canEmbed) return;
+  let list=null;
+  for(const h of RB_HOSTS){
+    try{ const r=await fetch(`${h}/json/stations/bycountrycodeexact/PH?order=votes&reverse=true&hidebroken=true&limit=120`);
+      if(r.ok){ list=await r.json(); break; } }catch(e){}
+  }
+  if(!list){ setStatus("AM/FM list couldn't be loaded right now; TV and TeleRadyo still work."); return; }
+  const seen=new Set(); let n=0;
+  for(const st of list){
+    const url=(st.url_resolved||st.url||"").trim();
+    if(!/^https:\/\//i.test(url)) continue;                           // the site is https; http streams would be blocked
+    if(/\.m3u8?$|\.pls$/i.test(url)) continue;                        // playlists need a parser; skip for reliability
+    const key=st.name.toLowerCase().replace(/[^a-z0-9]/g,"");
+    if(!key||seen.has(key)) continue; seen.add(key);
+    const tags=(st.tags||"").toLowerCase();
+    const band=/\bam\b|\bnews\b|balita|radyo|talk/.test(tags+" "+st.name.toLowerCase())?"AM / News-Talk":"FM / Music";
+    CHANNELS.push({n:st.name.trim(), net:(st.name.match(/\d{2,3}\.\d|\d{3,4}\s?khz/i)||[st.name.split(/\s+/)[0]])[0].toUpperCase(),
+      cat:"AM/FM", fm:true, src:url, logo:/^https:/.test(st.favicon||"")?st.favicon:null,
+      d:`${band}${st.state?" · "+st.state:""}${st.bitrate?" · "+st.bitrate+" kbps":""}`, c:FM_COLORS[n++%FM_COLORS.length]});
+    if(n>=48) break;
+  }
+  renderGrid(); markCards(); if(typeof refreshStatus==="function"&&!document.querySelector(".status .dot")) refreshStatus();
+}
+
+/* ---- Radio player ---- */
+const audio=document.getElementById("radio"), rwrap=document.getElementById("radioWrap"), viz=document.getElementById("viz");
+let actx=null, analyser=null, srcNode=null, vizRAF=0, vizReal=false, curFM=null;
+function playRadio(ch){
+  curFM=ch; wrap.innerHTML=""; wrap.style.display="none"; rwrap.hidden=false;
+  rwrap.style.setProperty("--glow", ch.c[0]);
+  $("#rname").textContent=ch.n; $("#rmeta").textContent=ch.d; $("#rstate").textContent="Tuning in…";
+  vizReal=false; startAudio(ch.src, true);
+}
+function startAudio(url, tryCors){
+  audio.pause(); audio.removeAttribute("src"); audio.load();
+  if(tryCors) audio.crossOrigin="anonymous"; else audio.removeAttribute("crossorigin");
+  audio.src=url+(url.includes("?")?"&":"?")+"_t="+Date.now();   // fresh connection each tune
+  audio.onerror=()=>{ if(tryCors){ startAudio(url,false); return; }     // station has no CORS → plain playback, animated bars
+    $("#rstate").textContent="This station isn't responding right now. Try another."; if(curFM){curFM.bad="off"; saveProbe(); markCards();} };
+  audio.onplaying=()=>{ $("#rstate").textContent="Live"; if(tryCors) hookAnalyser(); };
+  audio.onwaiting=()=>{ $("#rstate").textContent="Buffering…"; };
+  audio.play().catch(()=>{ $("#rstate").textContent="Press OK / tap to start audio"; });
+  startViz();
+}
+function hookAnalyser(){
+  try{
+    if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)();
+    if(!srcNode){ srcNode=actx.createMediaElementSource(audio); analyser=actx.createAnalyser(); analyser.fftSize=256;
+      srcNode.connect(analyser); analyser.connect(actx.destination); }
+    if(actx.state==="suspended") actx.resume();
+    vizReal=true;
+  }catch(e){ vizReal=false; }
+}
+function stopRadio(){
+  if(!curFM && rwrap.hidden) return;
+  cancelAnimationFrame(vizRAF); audio.pause(); audio.removeAttribute("src"); audio.load();
+  rwrap.hidden=true; wrap.style.display=""; curFM=null;
+}
+function startViz(){
+  cancelAnimationFrame(vizRAF);
+  const c=viz.getContext("2d"); const N=48; const data=new Uint8Array(128); let t=0;
+  const draw=()=>{
+    const W=viz.width=viz.clientWidth, H=viz.height=viz.clientHeight; c.clearRect(0,0,W,H);
+    const col=getComputedStyle(rwrap).getPropertyValue("--glow").trim()||"#0a9396";
+    let bars=[];
+    if(vizReal&&analyser){ analyser.getByteFrequencyData(data); for(let i=0;i<N;i++) bars.push(data[Math.floor(i*data.length/N*0.6)]/255); }
+    else { t+=0.03; const playing=!audio.paused; for(let i=0;i<N;i++){ const v=0.25+0.35*Math.abs(Math.sin(t*1.3+i*0.35))*Math.abs(Math.cos(t*0.7-i*0.2))+0.15*Math.random(); bars.push(playing?v:v*0.25); } }
+    const bw=W/N; const grad=c.createLinearGradient(0,H,0,H*0.3); grad.addColorStop(0,col); grad.addColorStop(1,"#ffffff");
+    c.fillStyle=grad; c.globalAlpha=0.85;
+    bars.forEach((v,i)=>{ const h=Math.max(4,v*H*0.55); c.beginPath(); c.roundRect(i*bw+bw*0.2,H-h,bw*0.6,h,6); c.fill(); });
+    // mirrored glow
+    c.globalAlpha=0.18; bars.forEach((v,i)=>{ const h=v*H*0.2; c.fillRect(i*bw+bw*0.2,H*0.999,bw*0.6,-h*0.5); });
+    c.globalAlpha=1; vizRAF=requestAnimationFrame(draw);
+  }; draw();
+}
+player.addEventListener("click",()=>{ if(curFM&&audio.paused) audio.play().catch(()=>{}); });
+document.addEventListener("keydown",e=>{ if(curFM&&(e.key==="Enter"||e.key===" ")&&audio.paused){ audio.play().catch(()=>{}); } });
+
+renderTabs(); renderGrid(); focusCard(0); probeAll(false); loadFM();
 </script>
 </body>
 </html>

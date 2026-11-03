@@ -191,192 +191,7 @@ function renderTabs(){
     const b = document.createElement("button");
     b.className="tab"; b.role="tab"; b.textContent=cat;
     b.setAttribute("aria-selected", cat===curCat);
-    b.onclick=()=>{curCat=cat; 
-/* Detect streams that won't play here and explain why instead of YouTube's bare "Video unavailable" */
-let ytReady=false, ytQueue=[];
-(function(){ if(!/^https?:$/.test(location.protocol)) return;
-  const t=document.createElement("script"); t.src="https://www.youtube.com/iframe_api"; document.head.appendChild(t); })();
-window.onYouTubeIframeAPIReady=()=>{ ytReady=true; ytQueue.splice(0).forEach(f=>f()); };
-function watchErrors(i){
-  const attach=()=>{ const f=document.getElementById("ytf"); if(!f||curIdx!==i) return;
-    new YT.Player(f,{events:{onError:e=>showUnavailable(i,e.data)}}); };
-  ytReady?attach():ytQueue.push(attach);
-}
-function showUnavailable(i,code){
-  if(curIdx!==i) return; const ch=CHANNELS[i];
-  const why = (code===101||code===150)
-    ? "The network isn't letting this stream play here right now. It may be blocked in your country, or the network may only allow it on YouTube itself."
-    : "This channel isn't broadcasting live right now. Try again later or switch channels.";
-  wrap.innerHTML=`<div class="offline"><h2>${ch.n} is unavailable</h2><p>${why}</p>
-    <p><button class="pbtn" id="skipBtn">Try next channel →</button></p></div>`;
-  const b=document.getElementById("skipBtn"); b.onclick=()=>zap(1); b.focus();
-  CHANNELS[i].bad=(code===101||code===150)?"geo":"off"; saveProbe(); markCards();
-}
-function markCards(){ grid.querySelectorAll(".card").forEach(c=>{
-  const ch=CHANNELS[+c.dataset.i]; const l=c.querySelector(".live");
-  if(ch.bad){ c.classList.add("bad"); l.textContent=ch.bad==="geo"?"BLOCKED HERE":"NOT LIVE NOW"; l.style.background="#555"; }
-  else { c.classList.remove("bad"); l.textContent=ch.dm?"AI DRAMA":ch.fm?"ON AIR":ch.radio?"RADIO":"● LIVE"; l.style.background=""; } }); }
-
-/* ---- Self-test: on this device, quietly try every channel and hide the ones that can't play here ---- */
-const PROBE_TTL=6*3600*1000, PROBE_KEY="pinoytv-probe-v1";
-function saveProbe(){ try{ localStorage.setItem(PROBE_KEY, JSON.stringify({t:Date.now(), bad:Object.fromEntries(CHANNELS.map(c=>[c.id,c.bad||null]))})); }catch(e){} }
-function loadProbe(){ try{ const o=JSON.parse(localStorage.getItem(PROBE_KEY)||"null"); if(!o||Date.now()-o.t>PROBE_TTL) return false;
-  CHANNELS.forEach(c=>{ c.bad=o.bad[c.id]||null; }); return true; }catch(e){ return false; } }
-function setStatus(html, busy){ const t=document.getElementById("statusText"); t.innerHTML=(busy?'<span class="dot"></span>':"")+html; }
-function refreshStatus(){
-  const hidden=CHANNELS.filter(c=>c.bad).length, ok=CHANNELS.length-hidden;
-  const sa=document.getElementById("showAllBtn"), rb=document.getElementById("recheckBtn");
-  sa.hidden=!hidden; rb.hidden=false; sa.textContent=showAll?`Hide unavailable (${hidden})`:`Show hidden (${hidden})`;
-  setStatus(hidden?`${ok} channels play on this device · ${hidden} hidden (blocked here or not live)`:`All ${ok} channels look playable on this device`);
-}
-function probeAll(force){
-  if(!canEmbed){ setStatus("Open this app from its web address to check and play channels."); return; }
-  if(!force && loadProbe()){ renderGrid(); markCards(); refreshStatus(); return; }
-  CHANNELS.forEach(c=>c.bad=null);
-  const box=document.getElementById("probes"); box.innerHTML="";
-  let done=0, queue=[...CHANNELS.keys()], running=0, MAXP=3;
-  setStatus(`Checking ${CHANNELS.length} channels on this device…`, true);
-  document.getElementById("recheckBtn").hidden=true;
-  const finish=()=>{ box.innerHTML=""; saveProbe(); renderGrid(); markCards(); refreshStatus(); focusCard(0); };
-  const next=()=>{
-    while(running<MAXP && queue.length){ running++; probeOne(queue.shift(), ()=>{ running--; done++;
-      setStatus(`Checking channels… ${done}/${CHANNELS.length}`, true); done===CHANNELS.length?finish():next(); }); }
-  };
-  ytReady?next():ytQueue.push(next);
-  function probeOne(i, cb){
-    const ch=CHANNELS[i]; let settled=false, pl=null;
-    const f=document.createElement("iframe"); f.id="probe-"+i;
-    f.src=`https://www.youtube.com/embed/live_stream?channel=${ch.id}&autoplay=1&mute=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`;
-    box.appendChild(f);
-    const end=(verdict)=>{ if(settled) return; settled=true; clearTimeout(tm); ch.bad=verdict; try{pl&&pl.destroy()}catch(e){} f.remove(); cb(); };
-    const tm=setTimeout(()=>end(null), 12000);           // no verdict in time: assume OK, don't hide
-    pl=new YT.Player(f,{events:{
-      onReady:e=>{ try{e.target.mute();e.target.playVideo();}catch(x){} },
-      onStateChange:e=>{ if(e.data===YT.PlayerState.PLAYING||e.data===YT.PlayerState.BUFFERING) end(null); },
-      onError:e=>{ end((e.data===101||e.data===150)?"geo":"off"); }
-    }});
-  }
-}
-document.getElementById("showAllBtn").onclick=()=>{ showAll=!showAll; renderGrid(); markCards(); refreshStatus(); focusCard(0); };
-document.getElementById("recheckBtn").onclick=()=>probeAll(true);
-
-/* ---- AM/FM: live station list from the open Radio Browser directory, played as audio with a visualizer ---- */
-const RB_HOSTS=["https://de1.api.radio-browser.info","https://nl1.api.radio-browser.info","https://at1.api.radio-browser.info","https://all.api.radio-browser.info"];
-const FM_COLORS=[["#0a9396","#005f73"],["#ee9b00","#bb3e03"],["#9b5de5","#f15bb5"],["#00b4d8","#0077b6"],["#e63946","#6a040f"],["#2d6a4f","#95d5b2"],["#ff6d00","#7b2cbf"],["#3a86ff","#8338ec"]];
-async function loadFM(){
-  if(!canEmbed) return;
-  let list=null;
-  for(const h of RB_HOSTS){
-    try{ const r=await fetch(`${h}/json/stations/bycountrycodeexact/PH?order=votes&reverse=true&hidebroken=true&limit=120`);
-      if(r.ok){ list=await r.json(); break; } }catch(e){}
-  }
-  if(!list){ setStatus("AM/FM list couldn't be loaded right now; TV and TeleRadyo still work."); return; }
-  const seen=new Set(); let n=0;
-  for(const st of list){
-    const url=(st.url_resolved||st.url||"").trim();
-    if(!/^https:\/\//i.test(url)) continue;                           // the site is https; http streams would be blocked
-    if(/\.m3u8?$|\.pls$/i.test(url)) continue;                        // playlists need a parser; skip for reliability
-    const key=st.name.toLowerCase().replace(/[^a-z0-9]/g,"");
-    if(!key||seen.has(key)) continue; seen.add(key);
-    const tags=(st.tags||"").toLowerCase();
-    const band=/\bam\b|\bnews\b|balita|radyo|talk/.test(tags+" "+st.name.toLowerCase())?"AM / News-Talk":"FM / Music";
-    CHANNELS.push({n:st.name.trim(), net:(st.name.match(/\d{2,3}\.\d|\d{3,4}\s?khz/i)||[st.name.split(/\s+/)[0]])[0].toUpperCase(),
-      cat:"AM/FM", fm:true, src:url, logo:/^https:/.test(st.favicon||"")?st.favicon:null,
-      d:`${band}${st.state?" · "+st.state:""}${st.bitrate?" · "+st.bitrate+" kbps":""}`, c:FM_COLORS[n++%FM_COLORS.length]});
-    if(n>=48) break;
-  }
-  renderGrid(); markCards(); if(typeof refreshStatus==="function"&&!document.querySelector(".status .dot")) refreshStatus();
-}
-
-/* ---- Radio player ---- */
-const audio=document.getElementById("radio"), rwrap=document.getElementById("radioWrap"), viz=document.getElementById("viz");
-let actx=null, analyser=null, srcNode=null, vizRAF=0, vizReal=false, curFM=null;
-function playRadio(ch){
-  curFM=ch; wrap.innerHTML=""; wrap.style.display="none"; rwrap.hidden=false;
-  rwrap.style.setProperty("--glow", ch.c[0]);
-  $("#rname").textContent=ch.n; $("#rmeta").textContent=ch.d; $("#rstate").textContent="Tuning in…";
-  vizReal=false; startAudio(ch.src, true);
-}
-function startAudio(url, tryCors){
-  audio.pause(); audio.removeAttribute("src"); audio.load();
-  if(tryCors) audio.crossOrigin="anonymous"; else audio.removeAttribute("crossorigin");
-  audio.src=url+(url.includes("?")?"&":"?")+"_t="+Date.now();   // fresh connection each tune
-  audio.onerror=()=>{ if(tryCors){ startAudio(url,false); return; }     // station has no CORS → plain playback, animated bars
-    $("#rstate").textContent="This station isn't responding right now. Try another."; if(curFM){curFM.bad="off"; saveProbe(); markCards();} };
-  audio.onplaying=()=>{ $("#rstate").textContent="Live"; if(tryCors) hookAnalyser(); };
-  audio.onwaiting=()=>{ $("#rstate").textContent="Buffering…"; };
-  audio.play().catch(()=>{ $("#rstate").textContent="Press OK / tap to start audio"; });
-  startViz();
-}
-function hookAnalyser(){
-  try{
-    if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)();
-    if(!srcNode){ srcNode=actx.createMediaElementSource(audio); analyser=actx.createAnalyser(); analyser.fftSize=256;
-      srcNode.connect(analyser); analyser.connect(actx.destination); }
-    if(actx.state==="suspended") actx.resume();
-    vizReal=true;
-  }catch(e){ vizReal=false; }
-}
-function stopRadio(){
-  if(!curFM && rwrap.hidden) return;
-  cancelAnimationFrame(vizRAF); audio.pause(); audio.removeAttribute("src"); audio.load();
-  rwrap.hidden=true; wrap.style.display=""; curFM=null;
-}
-function startViz(){
-  cancelAnimationFrame(vizRAF);
-  const c=viz.getContext("2d"); const N=48; const data=new Uint8Array(128); let t=0;
-  const draw=()=>{
-    const W=viz.width=viz.clientWidth, H=viz.height=viz.clientHeight; c.clearRect(0,0,W,H);
-    const col=getComputedStyle(rwrap).getPropertyValue("--glow").trim()||"#0a9396";
-    let bars=[];
-    if(vizReal&&analyser){ analyser.getByteFrequencyData(data); for(let i=0;i<N;i++) bars.push(data[Math.floor(i*data.length/N*0.6)]/255); }
-    else { t+=0.03; const playing=!audio.paused; for(let i=0;i<N;i++){ const v=0.25+0.35*Math.abs(Math.sin(t*1.3+i*0.35))*Math.abs(Math.cos(t*0.7-i*0.2))+0.15*Math.random(); bars.push(playing?v:v*0.25); } }
-    const bw=W/N; const grad=c.createLinearGradient(0,H,0,H*0.3); grad.addColorStop(0,col); grad.addColorStop(1,"#ffffff");
-    c.fillStyle=grad; c.globalAlpha=0.85;
-    bars.forEach((v,i)=>{ const h=Math.max(4,v*H*0.55); c.beginPath(); c.roundRect(i*bw+bw*0.2,H-h,bw*0.6,h,6); c.fill(); });
-    // mirrored glow
-    c.globalAlpha=0.18; bars.forEach((v,i)=>{ const h=v*H*0.2; c.fillRect(i*bw+bw*0.2,H*0.999,bw*0.6,-h*0.5); });
-    c.globalAlpha=1; vizRAF=requestAnimationFrame(draw);
-  }; draw();
-}
-player.addEventListener("click",()=>{ if(curFM&&audio.paused) audio.play().catch(()=>{}); });
-document.addEventListener("keydown",e=>{ if(curFM&&(e.key==="Enter"||e.key===" ")&&audio.paused){ audio.play().catch(()=>{}); } });
-
-/* ---- AI Drama: top AI-generated dramas from Dailymotion's public API, ranked by views, de-duplicated ---- */
-const DM_QUERIES=["AI drama","AI short drama","AI drama tagalog","AI teleserye","AI mini drama"];
-const DM_MATCH=/\bai\b|a\.i\.|artificial intelligence|\bai[- ]?(drama|serye|series|film|movie|short)/i;
-async function loadDramas(){
-  if(!canEmbed) return;
-  const seen=new Set(), pool=[], loose=[]; let fetched=0, lastErr="";
-  for(const q of DM_QUERIES){
-    for(let page=1;page<=2;page++){
-      try{
-        const u=`https://api.dailymotion.com/videos?search=${encodeURIComponent(q)}&sort=visited&limit=100&page=${page}&family_filter=true&private=false&password_protected=false&fields=id,title,thumbnail_360_url,views_total,duration,owner.screenname,tags`;
-        const r=await fetch(u); if(!r.ok){ lastErr="HTTP "+r.status; break; } const j=await r.json();
-        if(j.error){ lastErr=j.error.message||"API error"; break; }
-        for(const v of (j.list||[])){
-          fetched++;
-          if(!v.duration||v.duration<60) continue;                        // skip clips/teasers
-          const key=v.title.toLowerCase().replace(/\b(ep|episode|part|pt)\.?\s*\d+\b/g,"").replace(/[^a-z0-9]/g,"").slice(0,60);
-          if(!key||seen.has(key)||seen.has(v.id)) continue; seen.add(key); seen.add(v.id);
-          const text=(v.title+" "+(v.tags||[]).join(" "));
-          (DM_MATCH.test(text)?pool:loose).push(v);
-        }
-        if(!j.has_more) break;
-      }catch(e){ lastErr=e.message||"network"; break; }
-    }
-  }
-  let list=pool; if(list.length<20) list=pool.concat(loose);               // if strict matching is too thin, fall back to the search results as-is
-  list.sort((a,b)=>b.views_total-a.views_total);
-  list.slice(0,100).forEach((v,i)=>CHANNELS.push({
-    n:v.title.trim(), net:"#"+(i+1), cat:"AI Drama", dm:v.id, logo:v.thumbnail_360_url,
-    d:`${fmtViews(v.views_total)} views · ${Math.round(v.duration/60)} min · ${v["owner.screenname"]||""}`, c:["#5a189a","#ff0054"]}));
-  if(list.length){ renderGrid(); markCards(); }
-  else setStatus(`AI Drama list couldn't be loaded (${lastErr||"no results"}; fetched ${fetched}).`);
-}
-function fmtViews(n){ return n>=1e6?(n/1e6).toFixed(1)+"M":n>=1e3?Math.round(n/1e3)+"K":String(n); }
-
-renderTabs(); renderGrid(); focusCard(0); probeAll(false); loadFM(); loadDramas();};
+    b.onclick=()=>{curCat=cat; renderTabs(); renderGrid(); focusCard(0);};
     tabs.appendChild(b);
   });
 }
@@ -632,30 +447,32 @@ const DM_QUERIES=["AI drama","AI short drama","AI drama tagalog","AI teleserye",
 const DM_MATCH=/\bai\b|a\.i\.|artificial intelligence|\bai[- ]?(drama|serye|series|film|movie|short)/i;
 async function loadDramas(){
   if(!canEmbed) return;
-  const seen=new Set(), pool=[];
+  const seen=new Set(), pool=[], loose=[]; let fetched=0, lastErr="";
   for(const q of DM_QUERIES){
     for(let page=1;page<=2;page++){
       try{
-        const u=`https://api.dailymotion.com/videos?search=${encodeURIComponent(q)}&sort=visited&limit=100&page=${page}&family_filter=true&private=false&password_protected=false&allow_embed=true&fields=id,title,thumbnail_360_url,views_total,duration,owner.screenname,tags,created_time`;
-        const r=await fetch(u); if(!r.ok) break; const j=await r.json();
+        const u=`https://api.dailymotion.com/videos?search=${encodeURIComponent(q)}&sort=visited&limit=100&page=${page}&family_filter=true&private=false&password_protected=false&fields=id,title,thumbnail_360_url,views_total,duration,owner.screenname,tags`;
+        const r=await fetch(u); if(!r.ok){ lastErr="HTTP "+r.status; break; } const j=await r.json();
+        if(j.error){ lastErr=j.error.message||"API error"; break; }
         for(const v of (j.list||[])){
-          const text=(v.title+" "+(v.tags||[]).join(" "));
-          if(!DM_MATCH.test(text)) continue;                               // must actually be an AI drama
-          if(v.duration<60) continue;                                      // skip clips/teasers
+          fetched++;
+          if(!v.duration||v.duration<60) continue;                        // skip clips/teasers
           const key=v.title.toLowerCase().replace(/\b(ep|episode|part|pt)\.?\s*\d+\b/g,"").replace(/[^a-z0-9]/g,"").slice(0,60);
           if(!key||seen.has(key)||seen.has(v.id)) continue; seen.add(key); seen.add(v.id);
-          pool.push(v);
+          const text=(v.title+" "+(v.tags||[]).join(" "));
+          (DM_MATCH.test(text)?pool:loose).push(v);
         }
         if(!j.has_more) break;
-      }catch(e){ break; }
+      }catch(e){ lastErr=e.message||"network"; break; }
     }
   }
-  pool.sort((a,b)=>b.views_total-a.views_total);
-  pool.slice(0,100).forEach((v,i)=>CHANNELS.push({
+  let list=pool; if(list.length<20) list=pool.concat(loose);               // if strict matching is too thin, fall back to the search results as-is
+  list.sort((a,b)=>b.views_total-a.views_total);
+  list.slice(0,100).forEach((v,i)=>CHANNELS.push({
     n:v.title.trim(), net:"#"+(i+1), cat:"AI Drama", dm:v.id, logo:v.thumbnail_360_url,
     d:`${fmtViews(v.views_total)} views · ${Math.round(v.duration/60)} min · ${v["owner.screenname"]||""}`, c:["#5a189a","#ff0054"]}));
-  if(pool.length){ renderGrid(); markCards(); }
-  else setStatus("AI Drama list couldn't be loaded right now.");
+  if(list.length){ renderGrid(); markCards(); }
+  else setStatus(`AI Drama list couldn't be loaded (${lastErr||"no results"}; fetched ${fetched}).`);
 }
 function fmtViews(n){ return n>=1e6?(n/1e6).toFixed(1)+"M":n>=1e3?Math.round(n/1e3)+"K":String(n); }
 

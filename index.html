@@ -39,6 +39,7 @@
   .meta{padding:12px 14px 14px}
   .name{font-size:17px;font-weight:650;margin:0 0 4px}
   .desc{font-size:13px;color:var(--muted);margin:0;line-height:1.35}
+  .card.radio .live{background:#1d4ed8}
   .live{position:absolute;top:10px;left:10px;background:var(--red);color:#fff;font-size:11px;font-weight:700;
     padding:3px 8px;border-radius:6px;letter-spacing:.6px}
   .hint{color:var(--muted);font-size:13px;margin:22px 0 0;line-height:1.5}
@@ -79,7 +80,7 @@
   <div class="grid" id="grid"></div>
   <p class="hint">Works with a TV remote or keyboard: <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> to move, <kbd>OK</kbd>/<kbd>Enter</kbd> to watch, <kbd>Back</kbd>/<kbd>Esc</kbd> to return. Number keys jump straight to a channel.</p>
 </main>
-<footer>Every stream here is the network's own free, official livestream, played inside this app. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Networks decide where their streams can play, so some may be unavailable outside the Philippines or outside YouTube; the app marks those for you.</footer>
+<footer>Every TV channel and radio station here is the broadcaster's own free, official livestream, played inside this app. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Networks decide where their streams can play, so some may be unavailable outside the Philippines or outside YouTube; the app marks those for you.</footer>
 
 <section id="player" aria-modal="true" role="dialog">
   <div class="pbar">
@@ -97,19 +98,33 @@
    id = YouTube channel ID (enables the embedded live player)
    handle = fallback that opens the channel's /live page */
 const CHANNELS = [
-  {n:"GMA News", net:"GMA", cat:"News", id:"UCqYw-CTd1dU2yGI71sEyqNw",
-   d:"24 Oras, Saksi and live news coverage", c:["#ff6b00","#d00000"]},
-  {n:"ANC 24/7", net:"ANC", cat:"News", id:"UCvi6hEzLM-Z_unKPSuuzKvg",
+  // TV
+  {n:"Kapamilya Online Live", net:"ABS-CBN", cat:"TV", id:"UCstEtN0pgOmCf02EdXsGChw",
+   d:"ABS-CBN teleseryes and shows, streamed 24/7", c:["#0b3d91","#1fa34a","#e63946"]},
+  {n:"ABS-CBN News", net:"ABS-CBN", cat:"TV", id:"UCE2606prvXQc_noEqKxVJXA",
+   d:"TV Patrol, breaking news and special coverage", c:["#0b3d91","#1d4ed8"]},
+  {n:"ANC 24/7", net:"ANC", cat:"TV", id:"UCvi6hEzLM-Z_unKPSuuzKvg",
    d:"ABS-CBN News Channel, English-language news", c:["#7a0a0a","#c1121f"]},
-  {n:"One PH", net:"One PH", cat:"News", id:"UCi-D5IxBR2HahDyfJfqy7jA",
-   d:"Public service and news (Cignal)", c:["#00296b","#00509d"]},
-  {n:"GMA Public Affairs", net:"GMA", cat:"Public Affairs", id:"UCj5RwDivLksanrNvkW0FB4w",
+  {n:"GMA News", net:"GMA", cat:"TV", id:"UCqYw-CTd1dU2yGI71sEyqNw",
+   d:"24 Oras, Saksi and live news coverage", c:["#ff6b00","#d00000"]},
+  {n:"GMA Public Affairs", net:"GMA", cat:"TV", id:"UCj5RwDivLksanrNvkW0FB4w",
    d:"KMJS, documentaries and public affairs", c:["#f77f00","#6a040f"]},
-  {n:"ABS-CBN shows on iWantTFC", net:"iWantTFC", cat:"Entertainment", ext:"https://www.iwanttfc.com/",
-   d:"Teleseryes and TV Patrol, licensed for the US (opens the iWantTFC app)", c:["#0b3d91","#1fa34a"]},
+  {n:"One PH", net:"One PH", cat:"TV", id:"UCi-D5IxBR2HahDyfJfqy7jA",
+   d:"Public service and news (Cignal)", c:["#00296b","#00509d"]},
+  {n:"PTV", net:"PTV", cat:"TV", id:"UCJCUbMaY593_4SN1QPG7NFQ",
+   d:"People's Television, state broadcaster", c:["#0038a8","#ce1126"]},
+  // Radio (the stations' own YouTube livestreams)
+  {n:"DZMM TeleRadyo 630", net:"DZMM", cat:"Radio", id:"UCs_VNu-FQ0WcJnD4QkmIL5w", radio:true,
+   d:"Radyo Patrol 630 — ABS-CBN news and public service radio", c:["#1b4332","#2d6a4f"]},
+  {n:"Super Radyo DZBB 594", net:"DZBB", cat:"Radio", id:"UCYFgnkDYr-G5L_iy6DZdvSA", radio:true,
+   d:"GMA's flagship AM station — Ito ang Balita!", c:["#9d0208","#e85d04"]},
+  {n:"DZRH 666", net:"DZRH", cat:"Radio", id:"UCcTiBX8js_djhSSlmJRI99A", radio:true,
+   d:"DZRH News Television — MBC's flagship AM station, 24/7", c:["#003049","#669bbc"]},
+  {n:"90.7 Love Radio", net:"LOVE RADIO", cat:"Radio", id:"UC934DvzBQQnB5qBJpc50obg", radio:true,
+   d:"OPM hits and Manila's favorite FM station", c:["#b5179e","#f72585"]},
 ];
 
-const CATS = ["All", ...new Set(CHANNELS.map(c=>c.cat))];
+const CATS = ["All","TV","Radio"];
 let curCat = "All", curIdx = -1;
 const $ = s => document.querySelector(s);
 const grid = $("#grid"), tabs = $("#tabs"), player = $("#player"), wrap = $("#frameWrap");
@@ -157,8 +172,8 @@ function renderGrid(){
   grid.innerHTML="";
   visible().forEach((ch,i)=>{
     const b=document.createElement("button");
-    b.className="card"; b.dataset.i=CHANNELS.indexOf(ch);
-    b.innerHTML=`<span class="live">${ch.ext?"APP":"● LIVE"}</span>
+    b.className="card"+(ch.radio?" radio":""); b.dataset.i=CHANNELS.indexOf(ch);
+    b.innerHTML=`<span class="live">${ch.radio?"RADIO":"● LIVE"}</span>
       <div class="tile" style="background:linear-gradient(135deg,${ch.c.join(",")})">${ch.net}</div>
       <div class="meta"><p class="name">${i+1}. ${ch.n}</p><p class="desc">${ch.d}</p></div>`;
     b.onclick=()=>play(+b.dataset.i);
@@ -169,9 +184,7 @@ function renderGrid(){
 function focusCard(i){ const cards=[...grid.children]; if(cards[i]) cards[i].focus(); }
 
 function play(i){
-  const ch=CHANNELS[i];
-  if(ch.ext){ window.location.href=ch.ext; return; }
-  curIdx=i;
+  curIdx=i; const ch=CHANNELS[i];
   $("#ptitle").textContent=`${ch.n} · ${ch.net}`;
   if(!canEmbed){
     wrap.innerHTML=`<div class="offline"><h2>${ch.n}</h2>
@@ -190,7 +203,7 @@ function closePlayer(){
   if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
   const card=grid.querySelector(`[data-i="${curIdx}"]`); (card||grid.firstChild)?.focus();
 }
-function zap(d){ const n=CHANNELS.length; let j=curIdx; do{ j=(j+d+n)%n; }while(CHANNELS[j].ext&&j!==curIdx); play(j); }
+function zap(d){ const n=CHANNELS.length; play((curIdx+d+n)%n); }
 
 $("#backBtn").onclick=closePlayer;
 $("#prevBtn").onclick=()=>zap(-1);

@@ -51,6 +51,7 @@
   .card.fm .live{background:#0a9396}
   .card.dm .live{background:#7b2cbf}
   .card.dm.pickc .live{background:#ff9f1c;color:#000}
+  .card.filmc .live{background:#e94560}
   .card.dm .tile .logo{object-fit:cover;padding:0}
   .card.dm .tile span{position:absolute;left:10px;bottom:8px;font-size:16px;background:#0009;padding:2px 8px;border-radius:6px}
   .live{position:absolute;top:10px;left:10px;background:var(--red);color:#fff;font-size:11px;font-weight:700;
@@ -106,7 +107,7 @@
   <div class="grid" id="grid"></div>
   <p class="hint">Works with a TV remote or keyboard: <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> to move, <kbd>OK</kbd>/<kbd>Enter</kbd> to watch, <kbd>Back</kbd>/<kbd>Esc</kbd> to return. Number keys jump straight to a channel. When the app opens it checks every channel on your device and hides the ones that cannot play here; use <b>Show hidden</b> to see them anyway.</p>
 </main>
-<footer><span id="ver" style="float:right;opacity:.6">v1.9</span>TV and TeleRadyo channels are the broadcasters' own free, official livestreams. AM/FM stations come from the open Radio Browser directory (the same public station list many radio apps use) and play as audio inside this app. AI Drama shows the most-viewed AI-generated dramas on Dailymotion, played in Dailymotion's own player. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Networks decide where their streams can play, so some may be unavailable outside the Philippines or outside YouTube; the app marks those for you.</footer>
+<footer><span id="ver" style="float:right;opacity:.6">v2.0</span>TV and TeleRadyo channels are the broadcasters' own free, official livestreams. AM/FM stations come from the open Radio Browser directory (the same public station list many radio apps use) and play as audio inside this app. AI Films are curated from Hollywood.ai's free showcase and play from each creator's own YouTube upload; series play all episodes in order. AI Drama shows the most-viewed AI-generated dramas on Dailymotion, played in Dailymotion's own player. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Networks decide where their streams can play, so some may be unavailable outside the Philippines or outside YouTube; the app marks those for you.</footer>
 
 <div id="probes" aria-hidden="true"></div>
 <section id="player" aria-modal="true" role="dialog">
@@ -176,7 +177,7 @@ const CHANNELS = [
 ];
 
 
-const CATS = ["All","TV","TeleRadyo","AM/FM","AI Drama"];
+const CATS = ["All","TV","TeleRadyo","AM/FM","AI Films","AI Drama"];
 let curCat = "All", curIdx = -1;
 const $ = s => document.querySelector(s);
 const grid = $("#grid"), tabs = $("#tabs"), player = $("#player"), wrap = $("#frameWrap");
@@ -200,8 +201,8 @@ function renderGrid(){
   grid.innerHTML="";
   visible().forEach((ch,i)=>{
     const b=document.createElement("button");
-    b.className="card"+(ch.radio?" radio":"")+(ch.fm?" fm":"")+(ch.dm?" dm":"")+(ch.pick?" pickc":""); b.dataset.i=CHANNELS.indexOf(ch);
-    b.innerHTML=`<span class="live">${ch.pick?"★ PICK":ch.dm?"AI DRAMA":ch.fm?"ON AIR":ch.radio?"RADIO":"● LIVE"}</span>
+    b.className="card"+(ch.radio?" radio":"")+(ch.fm?" fm":"")+(ch.dm?" dm":"")+(ch.pick?" pickc":"")+(ch.film?" dm filmc":""); b.dataset.i=CHANNELS.indexOf(ch);
+    b.innerHTML=`<span class="live">${ch.film?(ch.film.pl?"SERIES · "+ch.film.pl.length+" EPS":"FILM"):ch.pick?"★ PICK":ch.dm?"AI DRAMA":ch.fm?"ON AIR":ch.radio?"RADIO":"● LIVE"}</span>
       <div class="tile" style="background:linear-gradient(135deg,${ch.c.join(",")})">${ch.logo?`<img class="logo" src="${ch.logo}" alt="" onerror="this.remove()">`:""}<span>${ch.net}</span></div>
       <div class="meta"><p class="name">${i+1}. ${ch.n}</p><p class="desc">${ch.d}</p></div>`;
     b.onclick=()=>play(+b.dataset.i);
@@ -216,6 +217,13 @@ function play(i){
   $("#ptitle").textContent=`${ch.n} · ${ch.net}`;
   stopRadio();
   if(ch.fm){ playRadio(ch); player.classList.add("open"); $("#backBtn").focus(); wake(); return; }
+  if(ch.film){
+    const f=ch.film, first=f.yt||f.pl[0], rest=f.pl?f.pl.slice(1).join(","):"";
+    wrap.innerHTML=`<iframe allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen
+      referrerpolicy="strict-origin-when-cross-origin"
+      src="https://www.youtube.com/embed/${first}?autoplay=1&rel=0&playsinline=1&cc_load_policy=1${rest?"&playlist="+rest:""}"></iframe>`;
+    player.classList.add("open"); $("#backBtn").focus(); wake(); return;
+  }
   if(ch.dm){
     wrap.innerHTML=`<iframe allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen
       src="https://www.dailymotion.com/embed/video/${ch.dm}?autoplay=1&queue-enable=false&ui-logo=false"></iframe>`;
@@ -316,7 +324,7 @@ function showUnavailable(i,code){
 function markCards(){ grid.querySelectorAll(".card").forEach(c=>{
   const ch=CHANNELS[+c.dataset.i]; const l=c.querySelector(".live");
   if(ch.bad){ c.classList.add("bad"); l.textContent=ch.bad==="geo"?"BLOCKED HERE":"NOT LIVE NOW"; l.style.background="#555"; }
-  else { c.classList.remove("bad"); l.textContent=ch.pick?"★ PICK":ch.dm?"AI DRAMA":ch.fm?"ON AIR":ch.radio?"RADIO":"● LIVE"; l.style.background=""; } }); }
+  else { c.classList.remove("bad"); l.textContent=ch.film?(ch.film.pl?"SERIES · "+ch.film.pl.length+" EPS":"FILM"):ch.pick?"★ PICK":ch.dm?"AI DRAMA":ch.fm?"ON AIR":ch.radio?"RADIO":"● LIVE"; l.style.background=""; } }); }
 
 /* ---- Self-test: on this device, quietly try every channel and hide the ones that can't play here ---- */
 const PROBE_TTL=6*3600*1000, PROBE_KEY="pinoytv-probe-v1";
@@ -510,6 +518,53 @@ async function loadPicks(){
     try{ localStorage.setItem("pinoytv-pickreport", JSON.stringify(pickReport)); }catch(e){}
   }catch(e){ setStatus("Couldn't verify the picks list ("+e.message+")."); }
 }
+
+/* ---- AI Films: curated from Hollywood.ai (free AI cinema showcase); every title plays from its creator's YouTube upload ---- */
+const AI_FILMS=[
+  // Full-length films
+  {n:"Last Day", by:"Epic AI Films", len:"1 hr 18 min", g:"Action · Thriller · Drama", yt:"gc6nfjiklRQ",
+   s:"A firefighter races through a collapsing city to reach his wife before disaster blocks every way home."},
+  {n:"Age of Kingdoms: The North Wall", by:"Epic AI Films", len:"1 hr 2 min", g:"Fantasy · Action · Drama", yt:"iFbZnb38gc8",
+   s:"Exiled in chains to the North Wall, Prince Varic must lead criminals and outcasts against an orc horde."},
+  {n:"End of the World: 2026", by:"Epic AI Films", len:"1 hr 5 min", g:"Sci-fi · Thriller", yt:"SE7C8E0EC74",
+   s:"Worldwide catastrophes destroy cities as ordinary people struggle to survive the fall of civilization."},
+  {n:"The Perfect Husband... or Narcissist", by:"LAYO TELLS", len:"33 min", g:"Drama", yt:"4cK2Wv_N0d0",
+   s:"A wealthy, seemingly ideal husband's attentiveness starts to feel like control, and his wife learns to stay silent."},
+  // Complete series (all episodes play in order)
+  {n:"The Beaumont Dynasty", by:"ReidWorks Studio", len:"9 episodes", g:"Family drama · Thriller · Romance",
+   pl:["1JCvB_99DpI","nLUikZ24Ktg","M_AIellxXps","jwQ5YNmnseE","tHpf3LIkY_Q","ej1n_f4lShw","W7qA3Xrn_qM","VtMc93c8ivk","hCEDGep7mvo"],
+   s:"Julian brings his secret wife home to the domineering Beaumont matriarch, and buried family secrets start to surface."},
+  {n:"My Husband Is My Boss", by:"AI Lab Studio", len:"10 episodes", g:"Romance · Drama (Russian, subtitled)",
+   pl:["l_EJ15UvWBw","pEzxMu9oKRI","B0x_AYaX9gg","g7IXuv5zWOw","Yk96-lnNBU4","fWF4AEIJeTw","CHuSmUfkuRI","Rri-du7mdxM","ZSlm76YgIVs","sCm6GWUHw_4"],
+   s:"A marriage of convenience: he needs it to save his company, she needs it to pay for her grandmother's surgery."},
+  {n:"Oath & Ash", by:"Brad Clark", len:"4 episodes", g:"Fantasy · Thriller · Drama",
+   pl:["yAN40V8XCxA","G0qQ3aLTOH8","8o73NS1wnYE","ZpZ2_mDBqkE"],
+   s:"An AI-generated fantasy drama told in four chapters."},
+  {n:"GONKA2049 (Episode 1)", by:"Katya Romanovskaya & Olena Losina", len:"Ep 1 of 27", g:"Sci-fi · Mystery", yt:"IXJchDPcEq4",
+   s:"An investigator of AI incidents hunts for a missing teenager whose father runs the largest AI megacorp."},
+  // Short films
+  {n:"Echoes of the Silent Planet", by:"Vincent Perez", len:"13 min", g:"Sci-fi · Drama", yt:"yrOTWKWp6xA",
+   s:"A stranded astronaut explores the ruins of a lost civilization and discovers he was never alone."},
+  {n:"A Face Only a Mother Could Love", by:"Robert Gaudette", len:"8 min", g:"Animation · Drama", yt:"wytfCS-N8Sk",
+   s:"Hollywood.ai spotlight film."},
+  {n:"Fear of the Dark", by:"Billy Boman", len:"7 min", g:"Horror · Surreal", yt:"wBNow3-Cylw",
+   s:"The human fear of the unknown, told through ancient archetypes and modern dread."},
+  {n:"The Cinema That Never Was", by:"Mark Wachholz", len:"6 min", g:"Documentary", yt:"dfludfofQGw",
+   s:"A video essay about films that were never made and histories that might have existed."},
+  {n:"BUN", by:"D4 Studios", len:"4 min", g:"Sci-fi", yt:"hMNoKGxnxic",
+   s:"After the world collapses, a black rabbit survives an alien attack and finds an unlikely companion."},
+  {n:"To the Void", by:"YZA Voku", len:"4 min", g:"Drama", yt:"06ciZoJxj_A",
+   s:"An award-winning short about how people adapt to nearly everything, even emptiness."},
+  {n:"Love From Void", by:"Junie Lau", len:"3 min", g:"Romance", yt:"kLAQU3nsNP8",
+   s:"Digital lovers reach across time and space to find each other."},
+  {n:"How to Train Your Human", by:"Noah Wagner", len:"2 min", g:"Comedy", yt:"7gP6x9QTTng",
+   s:"Pet ownership as a training routine, told from the dog's point of view."},
+  {n:"Lapse", by:"YZA Voku", len:"2 min", g:"Surreal", yt:"qfC9u96wHXw",
+   s:"A silent black-and-white meditation on repetition and death."},
+];
+AI_FILMS.forEach(f=>{ const first=f.yt||f.pl[0];
+  CHANNELS.push({n:f.n, net:f.pl?"SERIES":"FILM", cat:"AI Films", film:f, logo:`https://i.ytimg.com/vi/${first}/hqdefault.jpg`,
+    d:`${f.len} · ${f.g} · ${f.by}`, c:["#1b1b2f","#e94560"]}); });
 
 renderTabs(); renderGrid(); focusCard(0); probeAll(false); loadFM(); loadDramas().then(loadPicks);
 </script>

@@ -50,6 +50,7 @@
   .card.radio .live{background:#1d4ed8}
   .card.fm .live{background:#0a9396}
   .card.dm .live{background:#7b2cbf}
+  .card.dm.pickc .live{background:#ff9f1c;color:#000}
   .card.dm .tile .logo{object-fit:cover;padding:0}
   .card.dm .tile span{position:absolute;left:10px;bottom:8px;font-size:16px;background:#0009;padding:2px 8px;border-radius:6px}
   .live{position:absolute;top:10px;left:10px;background:var(--red);color:#fff;font-size:11px;font-weight:700;
@@ -105,7 +106,7 @@
   <div class="grid" id="grid"></div>
   <p class="hint">Works with a TV remote or keyboard: <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> to move, <kbd>OK</kbd>/<kbd>Enter</kbd> to watch, <kbd>Back</kbd>/<kbd>Esc</kbd> to return. Number keys jump straight to a channel. When the app opens it checks every channel on your device and hides the ones that cannot play here; use <b>Show hidden</b> to see them anyway.</p>
 </main>
-<footer><span id="ver" style="float:right;opacity:.6">v1.8</span>TV and TeleRadyo channels are the broadcasters' own free, official livestreams. AM/FM stations come from the open Radio Browser directory (the same public station list many radio apps use) and play as audio inside this app. AI Drama shows the most-viewed AI-generated dramas on Dailymotion, played in Dailymotion's own player. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Networks decide where their streams can play, so some may be unavailable outside the Philippines or outside YouTube; the app marks those for you.</footer>
+<footer><span id="ver" style="float:right;opacity:.6">v1.9</span>TV and TeleRadyo channels are the broadcasters' own free, official livestreams. AM/FM stations come from the open Radio Browser directory (the same public station list many radio apps use) and play as audio inside this app. AI Drama shows the most-viewed AI-generated dramas on Dailymotion, played in Dailymotion's own player. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Networks decide where their streams can play, so some may be unavailable outside the Philippines or outside YouTube; the app marks those for you.</footer>
 
 <div id="probes" aria-hidden="true"></div>
 <section id="player" aria-modal="true" role="dialog">
@@ -191,7 +192,7 @@ function renderTabs(){
     const b = document.createElement("button");
     b.className="tab"; b.role="tab"; b.textContent=cat;
     b.setAttribute("aria-selected", cat===curCat);
-    b.onclick=()=>{curCat=cat; renderTabs(); renderGrid(); focusCard(0);};
+    b.onclick=()=>{curCat=cat; renderTabs(); renderGrid(); focusCard(0); if(cat==="AI Drama"&&pickReport.ok.length+pickReport.rejected.length) setStatus(`${pickReport.ok.length} of ${DM_PICKS.length} picks verified playable · ${pickReport.rejected.length} dropped`); else if(typeof refreshStatus==="function"&&CHANNELS.some(c=>c.id)) refreshStatus();};
     tabs.appendChild(b);
   });
 }
@@ -199,8 +200,8 @@ function renderGrid(){
   grid.innerHTML="";
   visible().forEach((ch,i)=>{
     const b=document.createElement("button");
-    b.className="card"+(ch.radio?" radio":"")+(ch.fm?" fm":"")+(ch.dm?" dm":""); b.dataset.i=CHANNELS.indexOf(ch);
-    b.innerHTML=`<span class="live">${ch.dm?"AI DRAMA":ch.fm?"ON AIR":ch.radio?"RADIO":"● LIVE"}</span>
+    b.className="card"+(ch.radio?" radio":"")+(ch.fm?" fm":"")+(ch.dm?" dm":"")+(ch.pick?" pickc":""); b.dataset.i=CHANNELS.indexOf(ch);
+    b.innerHTML=`<span class="live">${ch.pick?"★ PICK":ch.dm?"AI DRAMA":ch.fm?"ON AIR":ch.radio?"RADIO":"● LIVE"}</span>
       <div class="tile" style="background:linear-gradient(135deg,${ch.c.join(",")})">${ch.logo?`<img class="logo" src="${ch.logo}" alt="" onerror="this.remove()">`:""}<span>${ch.net}</span></div>
       <div class="meta"><p class="name">${i+1}. ${ch.n}</p><p class="desc">${ch.d}</p></div>`;
     b.onclick=()=>play(+b.dataset.i);
@@ -315,7 +316,7 @@ function showUnavailable(i,code){
 function markCards(){ grid.querySelectorAll(".card").forEach(c=>{
   const ch=CHANNELS[+c.dataset.i]; const l=c.querySelector(".live");
   if(ch.bad){ c.classList.add("bad"); l.textContent=ch.bad==="geo"?"BLOCKED HERE":"NOT LIVE NOW"; l.style.background="#555"; }
-  else { c.classList.remove("bad"); l.textContent=ch.dm?"AI DRAMA":ch.fm?"ON AIR":ch.radio?"RADIO":"● LIVE"; l.style.background=""; } }); }
+  else { c.classList.remove("bad"); l.textContent=ch.pick?"★ PICK":ch.dm?"AI DRAMA":ch.fm?"ON AIR":ch.radio?"RADIO":"● LIVE"; l.style.background=""; } }); }
 
 /* ---- Self-test: on this device, quietly try every channel and hide the ones that can't play here ---- */
 const PROBE_TTL=6*3600*1000, PROBE_KEY="pinoytv-probe-v1";
@@ -476,7 +477,41 @@ async function loadDramas(){
 }
 function fmtViews(n){ return n>=1e6?(n/1e6).toFixed(1)+"M":n>=1e3?Math.round(n/1e3)+"K":String(n); }
 
-renderTabs(); renderGrid(); focusCard(0); probeAll(false); loadFM(); loadDramas();
+/* ---- Curated picks: the user's own Dailymotion list, verified on-device against Dailymotion's API before showing ---- */
+const DM_PICKS=["xbsh49m","xbhnmq6","xbnjvsm","xbfpvai","xbga51q","xb9swva","xbfpw76","xbrgkva","xbj5ycy","xbjf8da","xbndmr2","xbh3i5e","xbjcz0u","xbh13zq","xbcb0dq","xbjxmpi","xbkvp1e","xbfspra","xbbc4ou","xbpmx8u","xbgbwny","xbck8ta","xbkulmm","xb74j5y","xbqou8e","xbrolfe","xbeg5eu","xbeg4ti","xbfpuey","xb74eo6","xbhnlp6","xb2lszq"];
+const PICK_MIN_SEC=10*60;   // under 10 minutes is treated as a teaser/clip, not a complete story
+let pickReport={ok:[],rejected:[]};
+async function loadPicks(){
+  if(!canEmbed) return;
+  try{
+    const u=`https://api.dailymotion.com/videos?ids=${DM_PICKS.join(",")}&limit=100&fields=id,title,thumbnail_360_url,views_total,duration,owner.screenname,status,allow_embed,private,password_protected,language,description`;
+    const r=await fetch(u); if(!r.ok) throw new Error("HTTP "+r.status); const j=await r.json(); if(j.error) throw new Error(j.error.message);
+    const got=new Map((j.list||[]).map(v=>[v.id,v])); const seen=new Set();
+    DM_PICKS.forEach(id=>{
+      const v=got.get(id);
+      if(!v){ pickReport.rejected.push({id,why:"not found / removed"}); return; }
+      if(v.status!=="published"||v.private||v.password_protected){ pickReport.rejected.push({id,title:v.title,why:"not public ("+v.status+")"}); return; }
+      if(v.allow_embed===false){ pickReport.rejected.push({id,title:v.title,why:"embedding disabled"}); return; }
+      if(!v.duration||v.duration<PICK_MIN_SEC){ pickReport.rejected.push({id,title:v.title,why:`too short (${Math.round((v.duration||0)/60)} min)`}); return; }
+      const key=v.title.toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,60);
+      if(seen.has(key)){ pickReport.rejected.push({id,title:v.title,why:"duplicate title"}); return; } seen.add(key);
+      pickReport.ok.push(v);
+    });
+    pickReport.ok.sort((a,b)=>b.views_total-a.views_total);
+    // put picks first, then drop any copies of them from the search list
+    const pickIds=new Set(pickReport.ok.map(v=>v.id));
+    for(let i=CHANNELS.length-1;i>=0;i--) if(CHANNELS[i].dm&&pickIds.has(CHANNELS[i].dm)) CHANNELS.splice(i,1);
+    const firstDm=CHANNELS.findIndex(c=>c.dm); const at=firstDm<0?CHANNELS.length:firstDm;
+    CHANNELS.splice(at,0,...pickReport.ok.map((v,i)=>({
+      n:v.title.trim(), net:"PICK "+(i+1), cat:"AI Drama", dm:v.id, pick:true, logo:v.thumbnail_360_url,
+      d:`${fmtViews(v.views_total)} views · ${Math.round(v.duration/60)} min · ${v["owner.screenname"]||""}`, c:["#ff9f1c","#5a189a"]})));
+    renderGrid(); markCards();
+    if(curCat==="AI Drama") setStatus(`${pickReport.ok.length} of ${DM_PICKS.length} picks verified playable · ${pickReport.rejected.length} dropped`);
+    try{ localStorage.setItem("pinoytv-pickreport", JSON.stringify(pickReport)); }catch(e){}
+  }catch(e){ setStatus("Couldn't verify the picks list ("+e.message+")."); }
+}
+
+renderTabs(); renderGrid(); focusCard(0); probeAll(false); loadFM(); loadDramas().then(loadPicks);
 </script>
 </body>
 </html>

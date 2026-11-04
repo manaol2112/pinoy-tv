@@ -401,7 +401,7 @@ function setStatus(html, busy){ const t=document.getElementById("statusText"); t
 function setDramaStatus(html){ dramaStatus=html; if(curCat==="AI Drama") setStatus(html); }
 function refreshStatus(){
   if(curCat==="AI Drama"){ setStatus(dramaStatus||"Loading channel videos…"); return; }
-  const hidden=CHANNELS.filter(c=>c.bad).length, ok=CHANNELS.length-hidden;
+  const live=CHANNELS.filter(c=>c.id||c.fm); const hidden=live.filter(c=>c.bad).length, ok=live.length-hidden;
   const sa=document.getElementById("showAllBtn"), rb=document.getElementById("recheckBtn");
   sa.hidden=!hidden; rb.hidden=false; sa.textContent=showAll?`Hide unavailable (${hidden})`:`Show hidden (${hidden})`;
   setStatus(hidden?`${ok} channels play on this device · ${hidden} hidden (blocked here or not live)`:`All ${ok} channels look playable on this device`);
@@ -447,7 +447,7 @@ async function loadFM(){
     try{ const r=await fetch(`${h}/json/stations/bycountrycodeexact/PH?order=votes&reverse=true&hidebroken=true&limit=120`);
       if(r.ok){ list=await r.json(); break; } }catch(e){}
   }
-  if(!list){ setStatus("AM/FM list couldn't be loaded right now; TV and TeleRadyo still work."); return; }
+  if(!list){ if(curCat!=="AI Drama") setStatus("AM/FM list couldn't be loaded right now; TV and TeleRadyo still work."); return; }
   const seen=new Set(); let n=0;
   for(const st of list){
     const url=(st.url_resolved||st.url||"").trim();

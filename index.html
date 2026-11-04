@@ -155,7 +155,7 @@
   <div class="grid" id="grid"></div>
   <p class="hint">Works with a TV remote or keyboard: <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> to move, <kbd>OK</kbd>/<kbd>Enter</kbd> to watch, <kbd>Back</kbd>/<kbd>Esc</kbd> to return. Number keys jump straight to a channel. When the app opens it checks every channel on your device and hides the ones that cannot play here; use <b>Show hidden</b> to see them anyway.</p>
 </main>
-<footer><span id="ver" style="float:right;opacity:.6">v3.2</span>TV and TeleRadyo channels are the broadcasters' own free, official livestreams. AM/FM stations come from the open Radio Browser directory (the same public station list many radio apps use) and play as audio inside this app. AI Films are curated from Hollywood.ai's free showcase and play from each creator's own YouTube upload; series play all episodes in order. AI Drama is a browsable catalog of Bronze Terrace Screen's full-length dramas; Dailymotion doesn't allow its player on outside sites, so those open on Dailymotion. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Networks decide where their streams can play, so some may be unavailable outside the Philippines or outside YouTube; the app marks those for you.</footer>
+<footer><span id="ver" style="float:right;opacity:.6">v3.3</span>TV and TeleRadyo channels are the broadcasters' own free, official livestreams. AM/FM stations come from the open Radio Browser directory (the same public station list many radio apps use) and play as audio inside this app. AI Films are curated from Hollywood.ai's free showcase and play from each creator's own YouTube upload; series play all episodes in order. AI Drama is a browsable catalog of Bronze Terrace Screen's full-length dramas; Dailymotion doesn't allow its player on outside sites, so those open on Dailymotion. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Networks decide where their streams can play, so some may be unavailable outside the Philippines or outside YouTube; the app marks those for you.</footer>
 
 <div id="probes" aria-hidden="true"></div>
 <div id="toast"></div>
@@ -226,8 +226,8 @@ const CHANNELS = [
 ];
 
 
-const CATS = ["All","TV","TeleRadyo","AM/FM","AI Films","AI Drama"];
-let curCat = "All", curIdx = -1;
+const CATS = ["AI Drama","TV","TeleRadyo","AM/FM","AI Films","All"];
+let curCat = "AI Drama", curIdx = -1;
 const $ = s => document.querySelector(s);
 const grid = $("#grid"), tabs = $("#tabs"), player = $("#player"), wrap = $("#frameWrap");
 // YouTube embeds need a real web origin; opened as a local file they show Error 153.
@@ -756,7 +756,7 @@ function applyDramaFilter(){
 document.getElementById("dramaSearch").addEventListener("input",e=>{ dramaQuery=e.target.value; applyDramaFilter();
   setDramaStatus(dramaQuery?`${CHANNELS.filter(c=>c.dm).length} matches`:`${dramaAll.length} dramas · tap one to watch on Dailymotion`); });
 
-renderTabs(); renderGrid(); focusCard(0); probeAll(false); loadFM(); loadDramaCatalog(); renderResume();
+renderTabs(); renderGrid(); document.getElementById("dramaSearch").hidden=false; setStatus("Loading drama catalog…",true); probeAll(false); loadFM(); loadDramaCatalog().then(()=>{ const hb=document.querySelector(".hero .hbtn"); if(hb) hb.focus(); }); renderResume();
 </script>
 </body>
 </html>

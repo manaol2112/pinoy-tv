@@ -80,6 +80,30 @@
   .hint{color:var(--muted);font-size:13px;margin:22px 0 0;line-height:1.5}
   .hint kbd{background:var(--panel2);border-radius:4px;padding:1px 6px;font-family:inherit;color:var(--text)}
 
+
+  /* streaming-style drama layout */
+  #rows[hidden],.grid[hidden]{display:none}
+  .hero{position:relative;height:clamp(220px,34vw,420px);border-radius:18px;overflow:hidden;margin:0 0 22px;background:#000}
+  .hero .hbg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:saturate(1.1)}
+  .hero .hshade{position:absolute;inset:0;background:linear-gradient(90deg,#0b0f1aee 0%,#0b0f1a99 45%,#0b0f1a00 75%),linear-gradient(0deg,#0b0f1a 0%,#0000 40%)}
+  .hero .hinfo{position:absolute;left:clamp(16px,4vw,40px);bottom:clamp(16px,4vw,36px);max-width:min(620px,70%)}
+  .hero .hlab{color:var(--accent);font-weight:800;letter-spacing:2px;font-size:12px}
+  .hero h2{font-size:clamp(20px,3.2vw,40px);margin:6px 0 6px;line-height:1.15;text-shadow:0 4px 24px #000}
+  .hero p{color:#cfd6e6;margin:0 0 14px}
+  .hbtn{display:inline-block;background:var(--text);color:var(--bg);font-weight:800;padding:10px 18px;border-radius:10px;text-decoration:none;border:2px solid transparent}
+  .hbtn:hover,.hbtn:focus-visible{outline:none;border-color:var(--accent)}
+  .row{margin:0 0 22px}
+  .row h3{font-size:18px;margin:0 0 10px}
+  .row .rcount{color:var(--muted);font-weight:400;font-size:13px;margin-left:6px}
+  .rail{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x proximity;padding:6px 4px 10px;scrollbar-width:none}
+  .rail::-webkit-scrollbar{display:none}
+  .dcard{flex:0 0 clamp(170px,22vw,260px);scroll-snap-align:start;color:inherit;text-decoration:none;border-radius:12px;border:3px solid transparent;transition:transform .15s,border-color .15s}
+  .dcard:hover,.dcard:focus-visible{outline:none;transform:scale(1.04);border-color:var(--focus)}
+  .dthumb{position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:var(--panel)}
+  .dthumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .dlen{position:absolute;right:6px;bottom:6px;background:#000c;color:#fff;font-size:11px;font-weight:700;padding:2px 6px;border-radius:5px}
+  .dtitle{font-size:13px;font-weight:600;line-height:1.3;margin:8px 2px 2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .dmeta{font-size:11px;color:var(--muted);margin:0 2px}
   /* Player */
   #player{position:fixed;inset:0;background:#000;display:none;flex-direction:column;z-index:10}
   #player.open{display:flex}
@@ -127,10 +151,11 @@
     <button class="sbtn" id="recheckBtn" hidden>Re-check</button>
     <input id="dramaSearch" class="sinput" type="search" placeholder="Search dramas…" hidden></div>
   <div id="resume" class="resume" hidden></div>
+  <div id="rows" hidden></div>
   <div class="grid" id="grid"></div>
   <p class="hint">Works with a TV remote or keyboard: <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> to move, <kbd>OK</kbd>/<kbd>Enter</kbd> to watch, <kbd>Back</kbd>/<kbd>Esc</kbd> to return. Number keys jump straight to a channel. When the app opens it checks every channel on your device and hides the ones that cannot play here; use <b>Show hidden</b> to see them anyway.</p>
 </main>
-<footer><span id="ver" style="float:right;opacity:.6">v3.1</span>TV and TeleRadyo channels are the broadcasters' own free, official livestreams. AM/FM stations come from the open Radio Browser directory (the same public station list many radio apps use) and play as audio inside this app. AI Films are curated from Hollywood.ai's free showcase and play from each creator's own YouTube upload; series play all episodes in order. AI Drama is a browsable catalog of Bronze Terrace Screen's full-length dramas; Dailymotion doesn't allow its player on outside sites, so those open on Dailymotion. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Networks decide where their streams can play, so some may be unavailable outside the Philippines or outside YouTube; the app marks those for you.</footer>
+<footer><span id="ver" style="float:right;opacity:.6">v3.2</span>TV and TeleRadyo channels are the broadcasters' own free, official livestreams. AM/FM stations come from the open Radio Browser directory (the same public station list many radio apps use) and play as audio inside this app. AI Films are curated from Hollywood.ai's free showcase and play from each creator's own YouTube upload; series play all episodes in order. AI Drama is a browsable catalog of Bronze Terrace Screen's full-length dramas; Dailymotion doesn't allow its player on outside sites, so those open on Dailymotion. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Networks decide where their streams can play, so some may be unavailable outside the Philippines or outside YouTube; the app marks those for you.</footer>
 
 <div id="probes" aria-hidden="true"></div>
 <div id="toast"></div>
@@ -217,7 +242,7 @@ function renderTabs(){
     const b = document.createElement("button");
     b.className="tab"; b.role="tab"; b.textContent=cat;
     b.setAttribute("aria-selected", cat===curCat);
-    b.onclick=()=>{curCat=cat; renderTabs(); renderGrid(); focusCard(0); document.getElementById("dramaSearch").hidden=cat!=="AI Drama"; renderResume(); if(cat==="AI Drama") setStatus(dramaStatus||"Loading drama catalog…"); else if(typeof refreshStatus==="function"&&CHANNELS.some(c=>c.id)) refreshStatus();};
+    b.onclick=()=>{curCat=cat; renderTabs(); renderGrid(); focusCard(0); document.getElementById("dramaSearch").hidden=cat!=="AI Drama"; renderResume(); showDramaView(); if(cat==="AI Drama") setStatus(dramaStatus||"Loading drama catalog…"); else if(typeof refreshStatus==="function"&&CHANNELS.some(c=>c.id)) refreshStatus();};
     tabs.appendChild(b);
   });
 }
@@ -304,13 +329,22 @@ document.addEventListener("keydown",e=>{
     return;
   }
   if(/^[1-9]$/.test(k)){ const ch=visible()[+k-1]; if(ch&&!ch.ext){ play(CHANNELS.indexOf(ch)); } return; }
-  const cards=[...grid.children], tabBtns=[...tabs.children];
   const a=document.activeElement;
+  if(a&&a.classList&&a.classList.contains("dcard")){
+    const rail=a.parentElement, rails=[...document.querySelectorAll("#rows .rail")], ri=rails.indexOf(rail), ci=[...rail.children].indexOf(a);
+    let t=null;
+    if(k==="ArrowRight") t=rail.children[ci+1]; if(k==="ArrowLeft") t=rail.children[ci-1];
+    if(k==="ArrowDown") t=rails[ri+1]&&(rails[ri+1].children[Math.min(ci,rails[ri+1].children.length-1)]);
+    if(k==="ArrowUp"){ t=ri>0?rails[ri-1].children[Math.min(ci,rails[ri-1].children.length-1)]:document.querySelector(".hero .hbtn"); }
+    if(t){ t.focus(); t.scrollIntoView({block:"nearest",inline:"nearest",behavior:"smooth"}); e.preventDefault(); } return;
+  }
+  if(a&&a.classList&&a.classList.contains("hbtn")){ if(k==="ArrowDown"){ const f=document.querySelector("#rows .rail .dcard"); if(f){f.focus();e.preventDefault();} } if(k==="ArrowUp"){ tabs.children[CATS.indexOf(curCat)].focus(); e.preventDefault(); } return; }
+  const cards=[...grid.children], tabBtns=[...tabs.children];
   if(tabBtns.includes(a)){
     const i=tabBtns.indexOf(a);
     if(k==="ArrowRight"){tabBtns[Math.min(i+1,tabBtns.length-1)].focus();e.preventDefault();}
     if(k==="ArrowLeft"){tabBtns[Math.max(i-1,0)].focus();e.preventDefault();}
-    if(k==="ArrowDown"){focusCard(0);e.preventDefault();}
+    if(k==="ArrowDown"){ const hb=document.querySelector("#rows:not([hidden]) .hbtn"); if(hb) hb.focus(); else focusCard(0); e.preventDefault();}
     return;
   }
   let i=cards.indexOf(a); if(i<0){ if(k.startsWith("Arrow")){focusCard(0);e.preventDefault();} return; }
@@ -646,6 +680,56 @@ function renderResume(){
   document.getElementById("resumeClear").onclick=()=>{ saveResume(list.slice(1)); renderResume(); };
 }
 
+/* ---- AI Drama: streaming-style layout (hero + horizontal rows by genre), with search falling back to a grid ---- */
+const DRAMA_GENRES=[
+  {name:"Mafia & Billionaire", re:/mafia|billionaire|tycoon|ceo|boss|don\b|heir|rich|wealth|mob\b/i},
+  {name:"Alpha, Wolves & Beasts", re:/alpha|wolf|werewolf|omega|luna|mate\b|beast|dragon|vampire|siren|shifter|lycan/i},
+  {name:"Revenge & Rebirth", re:/revenge|reborn|rebirth|regret|betray|strikes back|reclaim|karma|vengeance|humiliat|comeback|payback/i},
+  {name:"Royal & Ancient", re:/prince|princess|queen|king\b|emperor|empress|throne|royal|palace|general|crown|dynasty|ancient|concubine/i},
+  {name:"Family, Babies & Secrets", re:/mommy|daddy|baby|twins?\b|son\b|daughter|mother|father|family|wife|husband|marriage|married|bride|divorce|secret/i},
+  {name:"Fantasy & Supernatural", re:/immortal|god\b|goddess|demon|magic|spell|cultivat|fairy|curse|ghost|hell\b|heaven|time travel|system/i},
+  {name:"En Español / Français / Português", re:/completa|completo|español|doblado|pel[ií]cula|film complet|fran[cç]ais|portugu[eê]s|série|serie\b/i},
+];
+function dramaGenreOf(d){ for(const g of DRAMA_GENRES) if(g.re.test(d.n)) return g.name; return "More Dramas"; }
+function fmtDur(d){ const m=parseInt(d.d); return isNaN(m)?"":(m>=60?`${Math.floor(m/60)}h ${m%60}m`:`${m}m`); }
+function dramaCard(d,i,cls){
+  const a=document.createElement("a"); a.className="dcard "+(cls||""); a.href=d.ext; a.target="_blank"; a.rel="noopener"; a.dataset.i=CHANNELS.indexOf(d);
+  a.innerHTML=`<div class="dthumb"><img loading="lazy" src="${d.logo}" alt="" onerror="this.remove()"><span class="dlen">${fmtDur(d)}</span></div>
+    <div class="dtitle">${d.n}</div><div class="dmeta">${d.net}</div>`;
+  a.addEventListener("click",ev=>{ ev.preventDefault(); rememberDrama(d); openExternal(d.ext); });
+  return a;
+}
+function renderDramaRows(){
+  const rows=document.getElementById("rows"); rows.innerHTML="";
+  const list=dramaAll; if(!list.length) return;
+  // hero: newest title
+  const h=list[0];
+  const hero=document.createElement("section"); hero.className="hero";
+  hero.innerHTML=`<img class="hbg" src="${h.logo}" alt=""><div class="hshade"></div>
+    <div class="hinfo"><div class="hlab">NEW THIS WEEK</div><h2>${h.n}</h2><p>${fmtDur(h)} · ${h.net}</p>
+    <a class="hbtn" href="${h.ext}" target="_blank" rel="noopener">▶ Watch on Dailymotion</a></div>`;
+  hero.querySelector(".hbtn").addEventListener("click",ev=>{ ev.preventDefault(); rememberDrama(h); openExternal(h.ext); });
+  rows.appendChild(hero);
+  const groups=new Map([["Latest", list.slice(0,30)]]);
+  const resume=loadResume(); if(resume.length) groups.set("Continue Watching", resume.map(r=>list.find(d=>d.dm===r.id)).filter(Boolean));
+  DRAMA_GENRES.forEach(g=>groups.set(g.name,[])); groups.set("More Dramas",[]);
+  for(const d of list){ const g=dramaGenreOf(d); if(groups.get(g).length<40) groups.get(g).push(d); }
+  for(const [name,items] of groups){
+    if(!items.length) continue;
+    const sec=document.createElement("section"); sec.className="row";
+    sec.innerHTML=`<h3>${name} <span class="rcount">${name==="Latest"||name==="Continue Watching"?"":list.filter(d=>dramaGenreOf(d)===name).length}</span></h3><div class="rail"></div>`;
+    const rail=sec.querySelector(".rail"); items.forEach((d,i)=>rail.appendChild(dramaCard(d,i)));
+    rows.appendChild(sec);
+  }
+}
+function showDramaView(){
+  const rows=document.getElementById("rows"), resume=document.getElementById("resume");
+  const isDrama=curCat==="AI Drama";
+  rows.hidden=!isDrama||!!dramaQuery.trim();
+  grid.hidden=isDrama&&!dramaQuery.trim();
+  if(isDrama){ resume.hidden=true; if(!dramaQuery.trim()) renderDramaRows(); }
+}
+
 /* ---- AI Drama catalog: Bronze Terrace Screen on Dailymotion. Dailymotion no longer allows embedding on
    outside sites, so these cards open the video on Dailymotion (app or site) instead of playing in-app. ---- */
 const DM_SOURCES=[{file:"bronze.json",owner:"Bronze Terrace Screen"},{file:"dm2.json",owner:"Drama Channel 2"}];
@@ -667,7 +751,7 @@ function applyDramaFilter(){
   for(let i=CHANNELS.length-1;i>=0;i--) if(CHANNELS[i].dm) CHANNELS.splice(i,1);
   const q=dramaQuery.trim().toLowerCase();
   const list=q?dramaAll.filter(d=>d.n.toLowerCase().includes(q)):dramaAll;
-  CHANNELS.push(...list.slice(0,300)); renderGrid(); markCards();
+  CHANNELS.push(...list.slice(0,300)); renderGrid(); markCards(); if(typeof showDramaView==="function") showDramaView();
 }
 document.getElementById("dramaSearch").addEventListener("input",e=>{ dramaQuery=e.target.value; applyDramaFilter();
   setDramaStatus(dramaQuery?`${CHANNELS.filter(c=>c.dm).length} matches`:`${dramaAll.length} dramas · tap one to watch on Dailymotion`); });

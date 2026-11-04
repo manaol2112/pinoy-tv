@@ -164,7 +164,7 @@
   <div class="grid" id="grid"></div>
   <p class="hint">Works with a TV remote or keyboard: <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> to move, <kbd>OK</kbd>/<kbd>Enter</kbd> to watch, <kbd>Back</kbd>/<kbd>Esc</kbd> to return. Number keys jump straight to a channel. When the app opens it checks every channel on your device and hides the ones that cannot play here; use <b>Show hidden</b> to see them anyway.</p>
 </main>
-<footer><span id="ver" style="float:right;opacity:.6">v3.4</span>TV and TeleRadyo channels are the broadcasters' own free, official livestreams. AM/FM stations come from the open Radio Browser directory (the same public station list many radio apps use) and play as audio inside this app. AI Films are curated from Hollywood.ai's free showcase and play from each creator's own YouTube upload; series play all episodes in order. AI Drama is a browsable catalog of Bronze Terrace Screen's full-length dramas; Dailymotion doesn't allow its player on outside sites, so those open on Dailymotion. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Networks decide where their streams can play, so some may be unavailable outside the Philippines or outside YouTube; the app marks those for you.</footer>
+<footer><span id="ver" style="float:right;opacity:.6">v3.5</span>TV and TeleRadyo channels are the broadcasters' own free, official livestreams. AM/FM stations come from the open Radio Browser directory (the same public station list many radio apps use) and play as audio inside this app. AI Films are curated from Hollywood.ai's free showcase and play from each creator's own YouTube upload; series play all episodes in order. AI Drama is a browsable catalog of Bronze Terrace Screen's full-length dramas; Dailymotion doesn't allow its player on outside sites, so those open on Dailymotion. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Networks decide where their streams can play, so some may be unavailable outside the Philippines or outside YouTube; the app marks those for you.</footer>
 
 <div id="probes" aria-hidden="true"></div>
 <div id="toast"></div>
@@ -654,7 +654,7 @@ const BROWSERS=[
 const OPENWITH_KEY="pinoytv-openwith";
 function getOpenWith(){ try{ return localStorage.getItem(OPENWITH_KEY)||""; }catch(e){ return ""; } }
 function setOpenWith(id){ try{ id?localStorage.setItem(OPENWITH_KEY,id):localStorage.removeItem(OPENWITH_KEY); }catch(e){} updateOpenWithBtn(); }
-function updateOpenWithBtn(){ const b=document.getElementById("openWithBtn"); if(!b) return; const cur=BROWSERS.find(x=>x.id===getOpenWith()); b.textContent="Opens in: "+(cur?cur.name:"Ask each time")+" ▾"; }
+function updateOpenWithBtn(){ const b=document.getElementById("openWithBtn"); if(!b) return; const cur=BROWSERS.find(x=>x.id===(getOpenWith()||"firefox")); b.textContent="Opens in: "+cur.name+" ▾"; }
 let toastT; function toast(msg,ms){ const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),ms||2500); }
 function launchIn(br,url){
   const ua=navigator.userAgent;
@@ -671,12 +671,12 @@ function launchIn(br,url){
   let left=false; const onHide=()=>{left=true};
   document.addEventListener("visibilitychange",onHide,{once:true}); window.addEventListener("pagehide",onHide,{once:true}); window.addEventListener("blur",onHide,{once:true});
   const t=Date.now(); location.href=br.ios(url);
-  setTimeout(()=>{ document.removeEventListener("visibilitychange",onHide); if(!left&&Date.now()-t<2500){ toast(br.name+" didn't respond — opening in default browser",3000); window.open(url,"_blank","noopener")||(location.href=url); } },1500);
+  setTimeout(()=>{ document.removeEventListener("visibilitychange",onHide); if(!left&&Date.now()-t<2500){ setOpenWith("default"); toast(br.name+" isn't installed — using your default browser (change under \"Opens in\")",3500); window.open(url,"_blank","noopener")||(location.href=url); } },1500);
 }
 function openExternal(url){
-  const pref=BROWSERS.find(b=>b.id===getOpenWith());
-  if(pref){ launchIn(pref,url); return; }
-  showChooser(url);
+  // Firefox is the default when nothing has been chosen; Android/iOS fall back to the default browser if it isn't installed
+  const pref=BROWSERS.find(b=>b.id===(getOpenWith()||"firefox"));
+  launchIn(pref,url);
 }
 function showChooser(url){
   const sh=document.getElementById("sheet");
@@ -686,12 +686,12 @@ function showChooser(url){
     <button class="sheetbtn ghost" id="sheetCancel">Cancel</button></div>`;
   sh.hidden=false;
   sh.querySelectorAll(".sheetbtn[data-id]").forEach(b=>b.onclick=()=>{ const br=BROWSERS.find(x=>x.id===b.dataset.id);
-    if(document.getElementById("sheetRemember").checked) setOpenWith(br.id); sh.hidden=true; launchIn(br,url); });
+    if(!url||document.getElementById("sheetRemember").checked) setOpenWith(br.id); sh.hidden=true; if(url) launchIn(br,url); else toast("Dramas will open in "+br.name); });
   document.getElementById("sheetCancel").onclick=()=>{ sh.hidden=true; };
   sh.onclick=ev=>{ if(ev.target===sh) sh.hidden=true; };
   sh.querySelector(".sheetbtn").focus();
 }
-document.getElementById("openWithBtn").onclick=()=>{ setOpenWith(""); toast("You'll be asked which browser to use next time"); };
+document.getElementById("openWithBtn").onclick=()=>showChooser(null);
 updateOpenWithBtn();
 
 /* ---- Continue watching: remember the last few dramas opened on Dailymotion and offer to reopen them ---- */

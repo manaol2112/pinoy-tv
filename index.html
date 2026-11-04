@@ -38,6 +38,17 @@
   .sbtn:focus-visible{outline:none;border-color:var(--focus)}
   .sinput{background:var(--panel);color:var(--text);border:2px solid transparent;border-radius:8px;padding:6px 12px;font-size:14px;min-width:220px;margin-left:auto}
   .sinput:focus-visible{outline:none;border-color:var(--focus)}
+  .resume{display:flex;gap:14px;align-items:center;background:linear-gradient(90deg,#1b2338,#141a2a);border:1px solid #ffffff14;border-radius:14px;padding:10px 14px;margin:0 0 16px}
+  .resume img{width:96px;height:54px;object-fit:cover;border-radius:8px;background:#0b0f1a;flex:none}
+  .resume .rtxt{flex:1;min-width:0}
+  .resume .rlab{font-size:11px;letter-spacing:1px;color:var(--accent);font-weight:700}
+  .resume .rttl{font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .resume .rsub{font-size:12px;color:var(--muted)}
+  .resume .rbtns{display:flex;gap:8px;flex:none}
+  .resume .rbtn{background:var(--accent);color:#000;border:2px solid transparent;border-radius:10px;padding:8px 14px;font-weight:700;cursor:pointer}
+  .resume .rbtn.ghost{background:var(--panel);color:var(--text)}
+  .resume .rbtn:focus-visible{outline:none;border-color:var(--focus)}
+  .resume[hidden]{display:none}
   .card.dm .tile .logo{object-fit:cover;padding:0}
   .card.dm .name{font-size:14px;line-height:1.3}
   .card.bad{opacity:.45}
@@ -113,10 +124,11 @@
     <button class="sbtn" id="showAllBtn" hidden>Show hidden</button>
     <button class="sbtn" id="recheckBtn" hidden>Re-check</button>
     <input id="dramaSearch" class="sinput" type="search" placeholder="Search dramas…" hidden></div>
+  <div id="resume" class="resume" hidden></div>
   <div class="grid" id="grid"></div>
   <p class="hint">Works with a TV remote or keyboard: <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> to move, <kbd>OK</kbd>/<kbd>Enter</kbd> to watch, <kbd>Back</kbd>/<kbd>Esc</kbd> to return. Number keys jump straight to a channel. When the app opens it checks every channel on your device and hides the ones that cannot play here; use <b>Show hidden</b> to see them anyway.</p>
 </main>
-<footer><span id="ver" style="float:right;opacity:.6">v2.7</span>TV and TeleRadyo channels are the broadcasters' own free, official livestreams. AM/FM stations come from the open Radio Browser directory (the same public station list many radio apps use) and play as audio inside this app. AI Films are curated from Hollywood.ai's free showcase and play from each creator's own YouTube upload; series play all episodes in order. AI Drama is a browsable catalog of Bronze Terrace Screen's full-length dramas; Dailymotion doesn't allow its player on outside sites, so those open on Dailymotion. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Networks decide where their streams can play, so some may be unavailable outside the Philippines or outside YouTube; the app marks those for you.</footer>
+<footer><span id="ver" style="float:right;opacity:.6">v2.8</span>TV and TeleRadyo channels are the broadcasters' own free, official livestreams. AM/FM stations come from the open Radio Browser directory (the same public station list many radio apps use) and play as audio inside this app. AI Films are curated from Hollywood.ai's free showcase and play from each creator's own YouTube upload; series play all episodes in order. AI Drama is a browsable catalog of Bronze Terrace Screen's full-length dramas; Dailymotion doesn't allow its player on outside sites, so those open on Dailymotion. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Networks decide where their streams can play, so some may be unavailable outside the Philippines or outside YouTube; the app marks those for you.</footer>
 
 <div id="probes" aria-hidden="true"></div>
 <section id="player" aria-modal="true" role="dialog">
@@ -202,7 +214,7 @@ function renderTabs(){
     const b = document.createElement("button");
     b.className="tab"; b.role="tab"; b.textContent=cat;
     b.setAttribute("aria-selected", cat===curCat);
-    b.onclick=()=>{curCat=cat; renderTabs(); renderGrid(); focusCard(0); document.getElementById("dramaSearch").hidden=cat!=="AI Drama"; if(cat==="AI Drama") setStatus(dramaStatus||"Loading drama catalog…"); else if(typeof refreshStatus==="function"&&CHANNELS.some(c=>c.id)) refreshStatus();};
+    b.onclick=()=>{curCat=cat; renderTabs(); renderGrid(); focusCard(0); document.getElementById("dramaSearch").hidden=cat!=="AI Drama"; renderResume(); if(cat==="AI Drama") setStatus(dramaStatus||"Loading drama catalog…"); else if(typeof refreshStatus==="function"&&CHANNELS.some(c=>c.id)) refreshStatus();};
     tabs.appendChild(b);
   });
 }
@@ -211,7 +223,7 @@ function renderGrid(){
   visible().forEach((ch,i)=>{
     const b=document.createElement(ch.ext?"a":"button");
     if(ch.ext){ b.href=ch.ext; b.target="_blank"; b.rel="noopener"; b.style.textDecoration="none"; b.style.display="block";
-      b.addEventListener("click",ev=>{ ev.preventDefault(); openExternal(ch.ext); }); }
+      b.addEventListener("click",ev=>{ ev.preventDefault(); rememberDrama(ch); openExternal(ch.ext); }); }
     b.className="card"+(ch.radio?" radio":"")+(ch.fm?" fm":"")+(ch.dm?" dm":"")+(ch.pick?" pickc":"")+(ch.chan?" chanc":"")+(ch.film?" dm filmc":""); b.dataset.i=CHANNELS.indexOf(ch);
     b.innerHTML=`<span class="live">${ch.ext?"▶ DAILYMOTION":ch.noEmbed?"NO EMBED":ch.film?(ch.film.pl?"SERIES · "+ch.film.pl.length+" EPS":"FILM"):ch.pick?"★ PICK":ch.chan?"CHANNEL":ch.dm?"AI DRAMA":ch.fm?"ON AIR":ch.radio?"RADIO":"● LIVE"}</span>
       <div class="tile" style="background:linear-gradient(135deg,${ch.c.join(",")})">${ch.logo?`<img class="logo" src="${ch.logo}" alt="" onerror="this.remove()">`:""}<span>${ch.net}</span></div>
@@ -607,6 +619,27 @@ function openExternal(url){
   const w=window.open(url,"_blank","noopener"); if(!w) location.href=url;
 }
 
+/* ---- Continue watching: remember the last few dramas opened on Dailymotion and offer to reopen them ---- */
+const RESUME_KEY="pinoytv-resume";
+function loadResume(){ try{ return JSON.parse(localStorage.getItem(RESUME_KEY)||"[]"); }catch(e){ return []; } }
+function saveResume(list){ try{ localStorage.setItem(RESUME_KEY, JSON.stringify(list.slice(0,5))); }catch(e){} }
+function rememberDrama(ch){
+  const list=loadResume().filter(x=>x.id!==ch.dm);
+  list.unshift({id:ch.dm, n:ch.n, logo:ch.logo, url:ch.ext, t:Date.now()}); saveResume(list); renderResume();
+}
+function renderResume(){
+  const box=document.getElementById("resume"); const list=loadResume();
+  if(!list.length||(curCat!=="AI Drama"&&curCat!=="All")){ box.hidden=true; return; }
+  const r=list[0]; const ago=Math.round((Date.now()-r.t)/60000);
+  const when=ago<1?"just now":ago<60?`${ago} min ago`:ago<1440?`${Math.round(ago/60)} h ago`:`${Math.round(ago/1440)} d ago`;
+  box.innerHTML=`<img src="${r.logo||""}" alt="" onerror="this.style.visibility='hidden'">
+    <div class="rtxt"><div class="rlab">CONTINUE WATCHING</div><div class="rttl">${r.n}</div><div class="rsub">Opened ${when} on Dailymotion${list.length>1?` · ${list.length-1} more recent`:""}</div></div>
+    <div class="rbtns"><button class="rbtn" id="resumeGo">▶ Continue</button><button class="rbtn ghost" id="resumeClear" title="Remove">✕</button></div>`;
+  box.hidden=false;
+  document.getElementById("resumeGo").onclick=()=>{ openExternal(r.url); r.t=Date.now(); saveResume(list); };
+  document.getElementById("resumeClear").onclick=()=>{ saveResume(list.slice(1)); renderResume(); };
+}
+
 /* ---- AI Drama catalog: Bronze Terrace Screen on Dailymotion. Dailymotion no longer allows embedding on
    outside sites, so these cards open the video on Dailymotion (app or site) instead of playing in-app. ---- */
 const DM_CATALOG_URL="bronze.json", DM_OWNER="Bronze Terrace Screen";
@@ -631,7 +664,7 @@ function applyDramaFilter(){
 document.getElementById("dramaSearch").addEventListener("input",e=>{ dramaQuery=e.target.value; applyDramaFilter();
   setDramaStatus(dramaQuery?`${CHANNELS.filter(c=>c.dm).length} matches`:`${dramaAll.length} dramas from ${DM_OWNER} · tap one to watch on Dailymotion`); });
 
-renderTabs(); renderGrid(); focusCard(0); probeAll(false); loadFM(); loadDramaCatalog();
+renderTabs(); renderGrid(); focusCard(0); probeAll(false); loadFM(); loadDramaCatalog(); renderResume();
 </script>
 </body>
 </html>

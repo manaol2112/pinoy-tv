@@ -128,7 +128,8 @@
     font-size:14px;cursor:pointer;text-decoration:none;white-space:nowrap}
   .pbtn:focus-visible,.pbtn.kfocus{outline:none;border-color:#fff}
   .ptitle{flex:1;font-weight:600;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  #frameWrap{flex:1;display:flex}
+  #frameWrap{flex:1;display:flex;position:relative}
+  .extbtn{position:absolute;right:14px;bottom:14px;background:var(--accent);color:#000;font-weight:700;z-index:3}
   #radioWrap{flex:1;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;
     background:radial-gradient(ellipse at 50% 80%, var(--glow,#0a9396) 0%, #000 60%)}
   #radioWrap[hidden]{display:none}
@@ -171,7 +172,7 @@
   <div class="grid" id="grid"></div>
   <p class="hint">Works with a TV remote or keyboard: <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> to move, <kbd>OK</kbd>/<kbd>Enter</kbd> to watch, <kbd>Back</kbd>/<kbd>Esc</kbd> to return. Number keys jump straight to a channel. When the app opens it checks every channel on your device and hides the ones that cannot play here; use <b>Show hidden</b> to see them anyway.</p>
 </main>
-<footer><span id="ver" style="float:right;opacity:.6">v3.6</span>TV and TeleRadyo channels are the broadcasters' own free, official livestreams. AM/FM stations come from the open Radio Browser directory (the same public station list many radio apps use) and play as audio inside this app. AI Films are curated from Hollywood.ai's free showcase and play from each creator's own YouTube upload; series play all episodes in order. AI Drama is a browsable catalog of Bronze Terrace Screen's full-length dramas; Dailymotion doesn't allow its player on outside sites, so those open on Dailymotion. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Networks decide where their streams can play, so some may be unavailable outside the Philippines or outside YouTube; the app marks those for you.</footer>
+<footer><span id="ver" style="float:right;opacity:.6">v3.7</span>TV and TeleRadyo channels are the broadcasters' own free, official livestreams. AM/FM stations come from the open Radio Browser directory (the same public station list many radio apps use) and play as audio inside this app. AI Films are curated from Hollywood.ai's free showcase and play from each creator's own YouTube upload; series play all episodes in order. AI Drama is a browsable catalog of Bronze Terrace Screen's full-length dramas; Dailymotion doesn't allow its player on outside sites, so those open on Dailymotion. When a network isn't broadcasting live, you'll see its latest stream or a "not live" notice. Networks decide where their streams can play, so some may be unavailable outside the Philippines or outside YouTube; the app marks those for you.</footer>
 
 <div id="probes" aria-hidden="true"></div>
 <div id="toast"></div>
@@ -243,7 +244,7 @@ const CHANNELS = [
 ];
 
 
-const CATS = ["AI Drama","TV","TeleRadyo","AM/FM","AI Films","All"];
+const CATS = ["AI Drama","Joanna","TV","TeleRadyo","AM/FM","AI Films","All"];
 let curCat = "AI Drama", curIdx = -1;
 const $ = s => document.querySelector(s);
 const grid = $("#grid"), tabs = $("#tabs"), player = $("#player"), wrap = $("#frameWrap");
@@ -270,8 +271,8 @@ function renderGrid(){
     if(ch.ext){ b.href=ch.ext; b.target="_blank"; b.rel="noopener"; b.style.textDecoration="none"; b.style.display="block";
       b.addEventListener("click",ev=>{ ev.preventDefault(); rememberDrama(ch); openExternal(ch.ext); }); }
     b.className="card"+(ch.radio?" radio":"")+(ch.fm?" fm":"")+(ch.dm?" dm":"")+(ch.pick?" pickc":"")+(ch.chan?" chanc":"")+(ch.film?" dm filmc":""); b.dataset.i=CHANNELS.indexOf(ch);
-    b.innerHTML=`<span class="live">${ch.ext?"▶ DAILYMOTION":ch.noEmbed?"NO EMBED":ch.film?(ch.film.pl?"SERIES · "+ch.film.pl.length+" EPS":"FILM"):ch.pick?"★ PICK":ch.chan?"CHANNEL":ch.dm?"AI DRAMA":ch.fm?"ON AIR":ch.radio?"RADIO":"● LIVE"}</span>
-      <div class="tile" style="background:linear-gradient(135deg,${ch.c.join(",")})">${ch.logo?`<img class="logo" loading="lazy" src="${ch.logo}" alt="" onerror="this.remove()">`:""}${ch.dm?"":`<span>${ch.net}</span>`}</div>
+    b.innerHTML=`<span class="live">${ch.ext?"▶ DAILYMOTION":ch.noEmbed?"NO EMBED":ch.film?(ch.film.list?"PLAYLIST":ch.film.pl?"SERIES · "+ch.film.pl.length+" EPS":ch.cat==="Joanna"?"VIDEO":"FILM"):ch.pick?"★ PICK":ch.chan?"CHANNEL":ch.dm?"AI DRAMA":ch.fm?"ON AIR":ch.radio?"RADIO":"● LIVE"}</span>
+      <div class="tile" style="background:linear-gradient(135deg,${ch.c.join(",")})">${ch.logo?`<img class="logo" loading="lazy" src="${ch.logo}" alt="" onerror="this.remove()">`:""}${ch.dm?"":`<span>${ch.cat==="Joanna"&&!ch.logo?"♪ "+ch.n.split(" — ")[0]:ch.net}</span>`}</div>
       <div class="meta"><p class="name">${i+1}. ${ch.n}</p><p class="desc">${ch.d}</p></div>`;
     if(!ch.ext) b.onclick=()=>play(+b.dataset.i);
     grid.appendChild(b);
@@ -286,10 +287,13 @@ function play(i){
   stopRadio();
   if(ch.fm){ playRadio(ch); player.classList.add("open"); $("#backBtn").focus(); wake(); return; }
   if(ch.film){
-    const f=ch.film, first=f.yt||f.pl[0], rest=f.pl?f.pl.slice(1).join(","):"";
+    const f=ch.film;
+    const src=f.list?`https://www.youtube.com/embed/videoseries?list=${f.list}&autoplay=1&rel=0&playsinline=1`
+      :`https://www.youtube.com/embed/${f.yt||f.pl[0]}?autoplay=1&rel=0&playsinline=1&cc_load_policy=1${f.pl?"&playlist="+f.pl.slice(1).join(","):""}`;
     wrap.innerHTML=`<iframe allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen
-      referrerpolicy="strict-origin-when-cross-origin"
-      src="https://www.youtube.com/embed/${first}?autoplay=1&rel=0&playsinline=1&cc_load_policy=1${rest?"&playlist="+rest:""}"></iframe>`;
+      referrerpolicy="strict-origin-when-cross-origin" src="${src}"></iframe>`
+      +(f.ext?`<button class="pbtn extbtn" id="extBtn">Full episodes on iWant →</button>`:"");
+    if(f.ext){ setTimeout(()=>{ const b=document.getElementById("extBtn"); if(b) b.onclick=()=>openExternal(f.ext); },0); }
     player.classList.add("open"); $("#backBtn").focus(); wake(); return;
   }
   if(ch.dm){
@@ -407,7 +411,7 @@ function showUnavailable(i,code){
 function markCards(){ grid.querySelectorAll(".card").forEach(c=>{
   const ch=CHANNELS[+c.dataset.i]; const l=c.querySelector(".live");
   if(ch.bad){ c.classList.add("bad"); l.textContent=ch.bad==="geo"?"BLOCKED HERE":"NOT LIVE NOW"; l.style.background="#555"; }
-  else { c.classList.remove("bad"); l.textContent=ch.ext?"▶ DAILYMOTION":ch.noEmbed?"NO EMBED":ch.film?(ch.film.pl?"SERIES · "+ch.film.pl.length+" EPS":"FILM"):ch.pick?"★ PICK":ch.chan?"CHANNEL":ch.dm?"AI DRAMA":ch.fm?"ON AIR":ch.radio?"RADIO":"● LIVE"; l.style.background=""; } }); }
+  else { c.classList.remove("bad"); l.textContent=ch.ext?"▶ DAILYMOTION":ch.noEmbed?"NO EMBED":ch.film?(ch.film.list?"PLAYLIST":ch.film.pl?"SERIES · "+ch.film.pl.length+" EPS":ch.cat==="Joanna"?"VIDEO":"FILM"):ch.pick?"★ PICK":ch.chan?"CHANNEL":ch.dm?"AI DRAMA":ch.fm?"ON AIR":ch.radio?"RADIO":"● LIVE"; l.style.background=""; } }); }
 
 /* ---- Self-test: on this device, quietly try every channel and hide the ones that can't play here ---- */
 const PROBE_TTL=6*3600*1000, PROBE_KEY="pinoytv-probe-v1";
@@ -808,6 +812,21 @@ function openGenre(name){ dramaGenre=name; dramaQuery=""; document.getElementByI
 function closeGenre(){ dramaGenre=""; applyDramaFilter(); }
 document.getElementById("dramaSearch").addEventListener("input",e=>{ dramaQuery=e.target.value; applyDramaFilter();
   setDramaStatus(dramaQuery?`${CHANNELS.filter(c=>c.dm).length} matches`:`${dramaAll.length} dramas · tap one to watch on Dailymotion`); });
+
+/* ---- Joanna's tab: Angeline Quinto ---- */
+const JOANNA=[
+  {n:"The Angeline Quinto Show", by:"iWant Original · ABS-CBN", len:"6 episodes · 44 min", g:"Talk show · Music", yt:"pnQvl4Uuy6Y", ext:"https://www.iwant.ph/",
+   s:"Angeline's own musical talk show with Kapamilya guests (Vice Ganda, Erik Santos and more). Trailer plays here; full episodes stream on iWant.", c:["#1b4332","#f5c518"]},
+  {n:"Love Angeline Quinto", by:"Angeline's YouTube channel", len:"Latest videos", g:"Vlogs · Behind the scenes", list:"UU__S15SdiT0vrCiyDl7DiMQ",
+   s:"Her vlogs, concert highlights and behind-the-scenes from The Angeline Quinto Show. Plays the newest video first; use the player's list to pick another.", c:["#b5179e","#f72585"]},
+  {n:"Kahit Konting Pagtingin — Full Episodes", by:"ABS-CBN Entertainment", len:"Full series", g:"Teleserye · Romance", list:"PLPcB0_P-Zlj5uWhxI3xWb1TqJjIs7nxCY",
+   s:"Angeline stars with Paulo Avelino and Sam Milby. Official ABS-CBN full-episode playlist, plays in order.", c:["#0b3d91","#1fa34a"]},
+  {n:"Single Bells (Full Movie)", by:"GMA Pictures", len:"Full movie", g:"Comedy", yt:"bED-M-ovOec",
+   s:"Alex Gonzaga and Angeline Quinto in the 2023 comedy, released uncut on GMA Pictures' official channel.", c:["#ff6b00","#d00000"]},
+];
+JOANNA.forEach(f=>{ const first=f.yt||null;
+  CHANNELS.push({n:f.n, net:f.list?"PLAYLIST":"VIDEO", cat:"Joanna", film:f, logo:first?`https://i.ytimg.com/vi/${first}/hqdefault.jpg`:null,
+    d:`${f.len} · ${f.g} · ${f.by}`, c:f.c}); });
 
 renderTabs(); renderGrid(); document.getElementById("dramaSearch").hidden=false; setStatus("Loading drama catalog…",true); probeAll(false); loadFM(); loadDramaCatalog().then(()=>{ const hb=document.querySelector(".hero .hbtn"); if(hb) hb.focus(); }); renderResume();
 </script>
